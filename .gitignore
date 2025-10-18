@@ -1,7 +1,14 @@
 # ==============================================================================
-# Local Development Files
+# Ignore all dotfiles and dotdirs by default
 # ==============================================================================
-.*local/
+.*
+
+# But keep these important dotfiles
+!.gitignore
+!.dockerignore
+
+# Ignore local development files
+*local*
 
 # ==============================================================================
 # ROS2 Build Artifacts
