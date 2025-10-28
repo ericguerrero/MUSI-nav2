@@ -29,6 +29,8 @@ This project provides a complete, containerized ROS2 Humble environment with:
 
 ### Required Software
 
+#### Linux (Ubuntu 20.04/22.04)
+
 1. **Docker and Docker Compose**
    ```bash
    # Install Docker
@@ -43,9 +45,64 @@ This project provides a complete, containerized ROS2 Humble environment with:
    docker-compose --version
    ```
 
+2. **X11 Server**: Already installed on Ubuntu Desktop
+
+#### WSL2 (Windows)
+
+1. **Docker Desktop for Windows** (Recommended)
+   - Download and install [Docker Desktop](https://www.docker.com/products/docker-desktop)
+   - During installation, ensure **"Use WSL 2 based engine"** is enabled
+   - After installation, open Docker Desktop → Settings → Resources → WSL Integration
+   - Enable integration with your Ubuntu distribution (e.g., Ubuntu-20.04)
+   - Start Docker Desktop (it must be running for Docker commands to work in WSL)
+
+   **Verify installation in WSL terminal**:
+   ```bash
+   docker --version
+   docker-compose --version
+
+   # Check Docker is running
+   docker ps
+   ```
+
 2. **X11 Server** (for GUI applications)
-   - **Ubuntu Desktop**: Already installed
-   - **WSL2**: Install VcXsrv or use WSLg (Windows 11)
+   - **Windows 11**: WSLg is built-in (no setup needed)
+   - **Windows 10**: Install [VcXsrv](https://sourceforge.net/projects/vcxsrv/) or [X410](https://x410.dev/)
+     - Launch XLaunch with settings: Multiple windows, Start no client, Disable access control
+     - Add to `~/.bashrc`:
+       ```bash
+       export DISPLAY=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}'):0
+       ```
+
+**Important**: Docker Desktop must be running on Windows before using Docker commands in WSL.
+
+#### macOS
+
+1. **Docker Desktop for Mac**
+   - Download and install [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop)
+   - Docker Desktop includes Docker Compose
+   - Start Docker Desktop from Applications
+
+   **Verify installation**:
+   ```bash
+   docker --version
+   docker-compose --version
+   ```
+
+2. **X11 Server** (for GUI applications)
+   - Install [XQuartz](https://www.xquartz.org/)
+   - Launch XQuartz → Preferences → Security → Enable "Allow connections from network clients"
+   - Restart XQuartz
+   - In terminal:
+     ```bash
+     # Allow X11 forwarding
+     xhost +localhost
+
+     # Set DISPLAY variable
+     export DISPLAY=host.docker.internal:0
+     ```
+
+**Note**: On Apple Silicon (M1/M2/M3), Docker will use Rosetta 2 for x86_64 images. Performance may vary.
 
 ---
 
@@ -343,6 +400,32 @@ docker system prune -a
 
 ## Troubleshooting
 
+### Issue: "Cannot connect to the Docker daemon" or "Is the docker daemon running?"
+
+**WSL2 Solution**:
+1. Ensure Docker Desktop is running on Windows
+2. Verify WSL integration is enabled:
+   - Open Docker Desktop → Settings → Resources → WSL Integration
+   - Enable for your Ubuntu distribution
+3. Restart Docker Desktop if needed
+4. Test in WSL: `docker ps`
+
+**Linux Solution**:
+```bash
+# Start Docker service
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Add user to docker group if not already done
+sudo usermod -aG docker $USER
+# Logout and login again
+```
+
+**macOS Solution**:
+1. Ensure Docker Desktop is running (check menu bar icon)
+2. Restart Docker Desktop if needed
+3. Test: `docker ps`
+
 ### Issue: "Permission denied" when running scripts
 
 **Solution**:
@@ -352,24 +435,42 @@ chmod +x build.sh run.sh stop.sh
 
 ### Issue: GUI applications don't display (Gazebo/RViz2)
 
-**Solution 1** - Enable X11 forwarding:
+**Linux Solution**:
 ```bash
+# Enable X11 forwarding
 xhost +local:docker
 export DISPLAY=:0
 docker-compose restart nav2_dev
 ```
 
-**Solution 2** - Check X11 socket permissions:
+**WSL2 Solution**:
+```bash
+# Windows 11 (WSLg) - should work automatically
+# If not, add to ~/.bashrc:
+export DISPLAY=:0
+
+# Windows 10 (VcXsrv/X410) - add to ~/.bashrc:
+export DISPLAY=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}'):0
+source ~/.bashrc
+
+# Ensure X server is running on Windows
+```
+
+**macOS Solution**:
+```bash
+# Ensure XQuartz is running
+# Enable X11 forwarding
+xhost +localhost
+export DISPLAY=host.docker.internal:0
+
+# Restart container
+docker-compose restart nav2_dev
+```
+
+**Check X11 socket** (Linux/WSL):
 ```bash
 ls -la /tmp/.X11-unix/
 # Should show X0 socket
-```
-
-**Solution 3** - WSL2 specific:
-```bash
-# Add to ~/.bashrc
-export DISPLAY=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}'):0
-source ~/.bashrc
 ```
 
 ### Issue: Gazebo shows "not responding" dialog
