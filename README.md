@@ -112,7 +112,7 @@ This project provides a complete, containerized ROS2 Humble environment with:
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/ericguerrero/MUSI-nav2.git
 cd MUSI-nav2
 
 # Build the Docker environment
