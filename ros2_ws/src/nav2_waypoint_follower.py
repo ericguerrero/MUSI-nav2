@@ -48,12 +48,14 @@ class Nav2WaypointFollower(Node):
         self.map_positions: List[Tuple[float, float, float]] = []
         self.start_map: Optional[Tuple[float, float]] = None
 
-        # Waypoints (4m × 4m square - centered at origin in empty world)
+        # Waypoints (4m × 4m square)
+        # Robot spawns at (2.0, -2.0) - bottom right corner
+        # Navigate clockwise: north → northwest → southwest → back to start
         self.waypoints = [
-            {'x': 2.0, 'y': -2.0, 'name': 'Point A - bottom right'},
-            {'x': 2.0, 'y': 2.0, 'name': 'Point B - top right'},
-            {'x': -2.0, 'y': 2.0, 'name': 'Point C - top left'},
-            {'x': -2.0, 'y': -2.0, 'name': 'Point D - bottom left (return)'},
+            {'x': 2.0, 'y': 2.0, 'name': 'Point A - northeast corner'},
+            {'x': -2.0, 'y': 2.0, 'name': 'Point B - northwest corner'},
+            {'x': -2.0, 'y': -2.0, 'name': 'Point C - southwest corner'},
+            {'x': 2.0, 'y': -2.0, 'name': 'Point D - return to start (southeast)'},
         ]
 
         self.get_logger().info('='*60)
@@ -144,10 +146,13 @@ class Nav2WaypointFollower(Node):
         self.navigator.waitUntilNav2Active()
         self.get_logger().info('Nav2 is active!')
 
-        # Set initial pose (robot spawns at 2, -2)
-        initial_pose = self.create_pose(2.0, -2.0)
+        # Set initial pose with realistic small error
+        # Robot spawns at (2.0, -2.0) but we tell AMCL it's at (2.1, -1.9)
+        # This creates ~0.14m initial error (realistic GPS/manual placement error)
+        # AMCL will correct this, demonstrating localization working
+        initial_pose = self.create_pose(2.1, -1.9)
         self.navigator.setInitialPose(initial_pose)
-        self.get_logger().info('Initial pose set: (2.0, -2.0) - matching spawn location')
+        self.get_logger().info('Initial pose set: (2.1, -1.9) - small 0.14m error from spawn (2.0, -2.0)')
 
         # Wait a moment for localization to settle
         self.get_logger().info('Waiting 2 seconds for localization...')
