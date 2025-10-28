@@ -25,10 +25,6 @@ if [ $? -eq 0 ]; then
     echo "Access the container:"
     echo "  docker exec -it nav2_workspace bash"
     echo ""
-    echo "Test commands inside container:"
-    echo "  ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py"
-    echo "  ros2 launch nav2_bringup navigation_launch.py"
-    echo ""
     echo "Stop environment:"
     echo "  ./stop.sh"
 else
