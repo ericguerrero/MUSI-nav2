@@ -2,6 +2,10 @@
 <sdf version="1.6">
   <world name="default">
 
+    <!-- ROS2 Gazebo Plugins -->
+    <plugin name="gazebo_ros_init" filename="libgazebo_ros_init.so"/>
+    <plugin name="gazebo_ros_factory" filename="libgazebo_ros_factory.so"/>
+
     <!-- Ground plane -->
     <include>
       <uri>model://ground_plane</uri>
