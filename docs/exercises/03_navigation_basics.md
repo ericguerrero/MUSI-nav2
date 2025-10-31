@@ -2,7 +2,7 @@
 
 **Session**: 3
 **Duration**: 60-90 minutes
-**Prerequisites**: Docker environment running, completed exercises 1 and 2
+**Prerequisites**: Docker environment running (see [Docker Setup Guide](../docker_setup.md))
 **Learning Objectives**:
 - Launch ROS2 simulation with Nav2 stack
 - Initialize robot localization using AMCL
@@ -360,46 +360,15 @@ Complete the following tasks to demonstrate mastery:
 4. Send navigation goal to (1.0, -2.0, 0.0) via RViz
 5. Verify robot reaches goal successfully
 
-**Deliverable:** Screenshot of RViz showing robot at goal position
-
 ### Task 2: Command-Line Navigation (Required)
 1. Use `ros2 action send_goal` to navigate to (1.0, -2.0)
 2. Capture the feedback output
 3. Verify goal success in terminal output
 
-**Deliverable:** Terminal output showing "Result: Goal reached!"
-
 ### Task 3: Monitoring (Required)
 1. While robot is navigating, echo `/amcl_pose` in another terminal
 2. List all active topics and count Nav2-related topics
 3. Identify the controller and planner nodes
-
-**Deliverable:**
-- Copy of `/amcl_pose` output showing position changing
-- Count of Nav2 topics (should be ~30+)
-- Names of controller and planner nodes
-
-### Task 4: Multiple Waypoints (Challenge)
-1. Navigate to at least 3 different goal positions
-2. Document coordinates and whether goal succeeded
-3. Identify any goals that failed and explain why
-
-**Deliverable:** Table of goals:
-```
-| Goal (x, y)  | Succeeded? | Notes |
-|--------------|------------|-------|
-| (1.0, -2.0)  | Yes        | Diagonal path |
-| ...          | ...        | ... |
-```
-
-### Task 5: Troubleshooting Practice (Challenge)
-1. Intentionally set a goal inside an obstacle
-2. Document the error message
-3. Explain why the goal failed using RViz costmaps
-
-**Deliverable:**
-- Screenshot of failed goal with costmap visible
-- Explanation of failure reason
 
 ---
 
@@ -412,7 +381,6 @@ After completing this exercise, you should understand:
 3. **Goal Specification:** Goals include position (x, y, z) and orientation (quaternion)
 4. **Path Planning vs. Control:** Global planner creates full path, local controller handles obstacle avoidance
 5. **Costmaps:** Multi-layered representation of environment for navigation decisions
-6. **QoS Policies:** ROS2 communication reliability settings affect message delivery
 
 ---
 
