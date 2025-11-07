@@ -29,8 +29,8 @@ RUN apt-get update && apt-get install -y \
     htop \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies for Nav2 examples
-RUN pip3 install --no-cache-dir transforms3d
+# Install Python dependencies for Nav2 examples and SLAM metrics
+RUN pip3 install --no-cache-dir transforms3d numpy pillow pyyaml scipy
 
 # Create workspace
 WORKDIR /ros2_ws

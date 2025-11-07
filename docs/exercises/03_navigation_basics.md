@@ -103,29 +103,14 @@ ros2 launch /ros2_ws/src/nav2.launch.py
 
 ## Part 3: Initialize Robot Localization (15 min)
 
-### Step 3: Set Initial Pose
+### Step 3: Initial Pose (Automatic)
 
-AMCL requires an initial pose estimate to start localization. Open a **third terminal** and publish the initial pose:
+AMCL requires an initial pose estimate to start localization. The Nav2 launch file automatically publishes the initial pose 5 seconds after startup.
 
-```bash
-docker exec -it nav2_workspace bash
-source /opt/ros/humble/setup.bash
-ros2 topic pub /initialpose geometry_msgs/msg/PoseWithCovarianceStamped '{
-  header: {frame_id: "map"},
-  pose: {
-    pose: {
-      position: {x: -2.0, y: 2.0, z: 0.0},
-      orientation: {w: 1.0}
-    }
-  }
-}' --rate 1 --times 3
-```
-
-**Command Breakdown:**
-- `--rate 1`: Publishes once per second
-- `--times 3`: Publishes 3 times total (ensures message delivery)
-- Position `(-2.0, 2.0, 0.0)`: Matches spawn position in Gazebo
-- Orientation `{w: 1.0}`: Quaternion for 0° heading (facing east)
+**What happens automatically:**
+- Position matches the robot's spawn location from `simulation_params.yaml`
+- Publishes 3 times to ensure reliable delivery
+- Sets initial uncertainty via covariance matrix
 
 **Verification:**
 
