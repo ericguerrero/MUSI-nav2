@@ -39,6 +39,8 @@ Found during the review that produced this design:
 | `shared/tests/test_multi_world_launch.sh` | Byte-identical duplicate of `tests/test_multi_world_launch.sh` |
 | `ros2_ws/src/nav2.launch.py` | Docstring and defaults reference `ex3_2_spawn_robot.launch.py` and `nav2_params_ex3.yaml`; neither exists |
 | Working tree | `ros2_ws/src/replay_bag.launch.py` and `shared/scripts/` untracked and undecided |
+| `simulation.launch.py` spawn | `spawn_entity.py` waited 30 s for `/spawn_entity`, but Gazebo's ROS interface needs ~60 s here. **The robot never spawned.** Its error blames a missing factory plugin, which was in fact loaded — found in Phase 1, fixed in `00af895` |
+| `shared/worlds/*.world` | Three of four are root-owned on the host, created through the bind mount by the container running as root. Host-side edits fail with `PermissionError`; students will hit this. **Not yet fixed** — `chown` needs host `sudo` |
 
 ### 1.2 Stale branches
 
@@ -97,14 +99,27 @@ extending the container.
 
 ### 3.1 Groundtruth layer (L1)
 
-**Enabling the signal is a one-line change.** `simulation.launch.py:227-230`
-starts gzserver with `-s libgazebo_ros_init.so -s libgazebo_ros_factory.so`.
-Adding `-s libgazebo_ros_state.so` to that argument list publishes `/model_states`
-for all four worlds at once.
+**Corrected 2026-09-05 during Phase 1.** This section originally claimed that
+adding `-s libgazebo_ros_state.so` to the gzserver arguments was a one-line change
+covering all four worlds, and that editing the world files was unnecessary. That is
+wrong, and testing caught it.
 
-Editing the world files is unnecessary. The `<plugin>` entries at
-`landmark_world.world:6-7` duplicate what the launch file already passes, which is
-why the other three worlds work despite declaring no plugins of their own.
+`gzserver`'s `-s` flag loads *system* plugins. `libgazebo_ros_init.so` and
+`libgazebo_ros_factory.so` are system plugins, but `GazeboRosState` registers as a
+**world plugin**, so `-s` silently fails to load it — gzserver starts, reports no
+error, and `/model_states` never appears.
+
+The plugin must therefore be declared inside each world file's `<world>` element:
+
+```xml
+<plugin name="gazebo_ros_state" filename="libgazebo_ros_state.so">
+  <ros><namespace>/</namespace></ros>
+  <update_rate>50.0</update_rate>
+</plugin>
+```
+
+All four world files carry this, each with a comment recording why `-s` cannot
+work, since `-s` is the natural first guess for anyone revisiting it.
 
 **New node**: `ros2_ws/src/groundtruth_pose.py`
 
@@ -113,9 +128,16 @@ why the other three worlds work despite declaring no plugins of their own.
   `/groundtruth/odom` (`nav_msgs/Odometry`, carrying twist so controllers get
   velocity feedback without differentiating pose)
 - Broadcasts TF: `world -> base_footprint_gt`
-- Parameters: `model_name` (default `waffle`; overridable so student-authored
-  robots work), `publish_rate` (default 50 Hz; `/model_states` fires far faster
-  than any controller needs)
+- Parameters: `model_name` (default `turtlebot3_waffle`, matching the `-entity`
+  name `simulation.launch.py` spawns — an earlier draft said `waffle`, which
+  matches nothing), `publish_rate` (default `0.0`, meaning publish every message)
+
+**On the rate.** An earlier draft had the node throttle to 50 Hz. That is actively
+harmful: `/model_states` already arrives at the rate the world file's
+`<update_rate>` sets, and throttling a 50 Hz source to 50 Hz drops any sample
+landing a hair under the interval, aliasing the measured rate down to about 33 Hz.
+The world file is the single rate authority; `publish_rate` now exists only to
+downsample below it.
 
 The node is standalone. In `dev` this logic lives inside
 `nav2_waypoint_follower.py` and silently degrades to an odom-versus-AMCL fallback
@@ -243,8 +265,9 @@ behaviour.
 
 1. `ros2 topic echo /groundtruth/pose` returns non-empty `PoseStamped` messages in
    all four worlds (landmark, turtlebot3_world, turtlebot3_house, empty_world).
-2. `/groundtruth/odom` publishes at the configured rate, measured with
-   `ros2 topic hz`, within 10% of the 50 Hz target.
+2. `/groundtruth/odom` publishes within 10% of 50 Hz, measured with
+   `ros2 topic hz`. The rate comes from the world file's `<update_rate>`, not from
+   the node. *(Met: 49.966 Hz.)*
 3. `ros2 run tf2_ros tf2_echo world base_footprint_gt` resolves.
 4. The `model_name` parameter resolves a non-default model.
 5. `controller_template.py` runs unmodified and drives the robot toward a
