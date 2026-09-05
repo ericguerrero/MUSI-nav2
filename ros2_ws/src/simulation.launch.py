@@ -269,6 +269,7 @@ def generate_launch_description():
                 name='spawn_turtlebot3',
                 output='screen',
                 arguments=[
+                    '-timeout', '180',
                     '-entity', 'turtlebot3_waffle',
                     '-file', os.path.join(gazebo_dir, 'models', 'turtlebot3_waffle', 'model.sdf'),
                     '-x', x_pose,
