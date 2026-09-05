@@ -263,6 +263,12 @@ behaviour.
 
 ## 7. Success criteria
 
+**Status after Phase 1 (2026-09-06).** Met: 1, 2, 3, 4, 10, 11, 12 — see
+`docs/verification.md`. Pending Phase 2: 5, 6, 7 (controller template and
+evaluation harness). Pending Phase 3: 8, 9 (Ackermann reference robot); 9 is a
+stretch goal per §9.
+
+
 1. `ros2 topic echo /groundtruth/pose` returns non-empty `PoseStamped` messages in
    all four worlds (landmark, turtlebot3_world, turtlebot3_house, empty_world).
 2. `/groundtruth/odom` publishes within 10% of 50 Hz, measured with
@@ -292,7 +298,7 @@ behaviour.
 
 Phases are ordered by deliverability. An overrun costs Phase 3, not the task.
 
-### Phase 1 — Verified base with groundtruth (MVP)
+### Phase 1 — Verified base with groundtruth (MVP) — COMPLETE 2026-09-06
 
 Hygiene first, because it is cheap and unblocks clean commits:
 
