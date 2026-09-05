@@ -1,6 +1,16 @@
 <?xml version="1.0" ?>
 <sdf version="1.6">
   <world name="default">
+    <!-- Publishes true model poses on /model_states, the feedback signal for
+         control exercises. Must be a world plugin: GazeboRosState registers as
+         one, so gzserver -s (system plugin) cannot load it. -->
+    <plugin name="gazebo_ros_state" filename="libgazebo_ros_state.so">
+      <ros>
+        <namespace>/</namespace>
+      </ros>
+      <update_rate>50.0</update_rate>
+    </plugin>
+
 
     <!-- ROS2 Gazebo Plugins -->
     <plugin name="gazebo_ros_init" filename="libgazebo_ros_init.so"/>
