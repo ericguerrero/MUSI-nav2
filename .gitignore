@@ -29,10 +29,8 @@ shared/maps/*.yaml
 # ==============================================================================
 # ROS2 Bag Files (Can be very large)
 # ==============================================================================
-shared/bags/*.db3
-shared/bags/*.db3-shm
-shared/bags/*.db3-wal
-shared/bags/metadata.yaml
+shared/bags/**
+!shared/bags/.gitkeep
 *.bag
 
 # ==============================================================================

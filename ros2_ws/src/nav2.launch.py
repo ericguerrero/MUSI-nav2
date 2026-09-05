@@ -3,14 +3,14 @@
 Exercise 3 - Step 3: Launch Nav2 Navigation Stack
 
 Starts the full Nav2 stack with map server, AMCL localization, planners, and controllers.
-Run this AFTER robot is spawned (ex3_2_spawn_robot.launch.py).
+Run this AFTER the simulation is running (simulation.launch.py).
 
 Usage:
-    ros2 launch ex3_3_nav2.launch.py
+    ros2 launch /ros2_ws/src/nav2.launch.py
 
 Optional arguments:
     map:=/path/to/map.yaml    (default: landmark_map.yaml)
-    params:=/path/to/params   (default: nav2_params_ex3.yaml)
+    params:=/path/to/params   (default: nav2_params.yaml)
 
 Expected: Nav2 servers start, AMCL initializes, ready for navigation goals
 """

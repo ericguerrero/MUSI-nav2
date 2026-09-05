@@ -2,7 +2,7 @@
 
 **Session**: 3
 **Duration**: 60-90 minutes
-**Prerequisites**: Docker environment running (see [Docker Setup Guide](../docker_setup.md))
+**Prerequisites**: Docker environment running (see [Installation Guide](../installation.md))
 **Learning Objectives**:
 - Launch ROS2 simulation with Nav2 stack
 - Initialize robot localization using AMCL
