@@ -4,7 +4,7 @@
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 DEMOS=(sim_landmark sim_turtlebot3_world sim_turtlebot3_house sim_empty_world
-       groundtruth nav2 slam_nav2 slam_cartographer replay_bag)
+       groundtruth control_loop nav2 slam_nav2 slam_cartographer replay_bag)
 
 declare -A RESULT
 for demo in "${DEMOS[@]}"; do

@@ -7,4 +7,4 @@ exec docker run --rm \
     -v "${REPO}/ros2_ws:/ros2_ws:ro" \
     -v "${REPO}/tests:/tests:ro" \
     nav2_student:humble \
-    bash -lc "python3 -m pytest /tests/test_groundtruth_pose.py -v -p no:cacheprovider ${*}"
+    bash -lc "python3 -m pytest /tests/ -v -p no:cacheprovider ${*}"

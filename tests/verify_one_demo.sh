@@ -61,6 +61,15 @@ case "${DEMO}" in
         sleep 50
         has_data /map 40
         ;;
+    control_loop)
+        start_sim empty_world || { echo "no /model_states"; exit 1; }
+        python3 /ros2_ws/src/groundtruth_pose.py >>"${LOG}" 2>&1 &
+        sleep 10
+        python3 /ros2_ws/src/controller_template.py --ros-args \
+            -p reference:=circle >>"${LOG}" 2>&1 &
+        sleep 20
+        has_data /cmd_vel 20 && has_data /reference/pose 20
+        ;;
     replay_bag)
         BAG=$(ls -d /shared/bags/*/ 2>/dev/null | head -1)
         [ -z "${BAG}" ] && { echo "no bag present"; exit 1; }

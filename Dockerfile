@@ -8,7 +8,15 @@ LABEL version="1.0"
 # Avoid interactive prompts during build
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install all necessary packages in single layer for efficiency
+# Install all necessary packages in single layer for efficiency.
+#
+# ros2_control and its controllers give students a standard interface for
+# swapping kinematics: ackermann_steering_controller, mecanum_drive_controller,
+# tricycle_steering_controller and diff_drive_controller are configured from
+# YAML rather than hand-written Gazebo plugin blocks. gazebo_ros2_control is the
+# bridge that lets those controllers drive Gazebo Classic.
+#
+# matplotlib backs the trajectory plots in the evaluation harness.
 RUN apt-get update && apt-get install -y \
     ros-humble-navigation2 \
     ros-humble-nav2-bringup \
@@ -17,6 +25,9 @@ RUN apt-get update && apt-get install -y \
     ros-humble-cartographer \
     ros-humble-cartographer-ros \
     ros-humble-slam-toolbox \
+    ros-humble-ros2-control \
+    ros-humble-ros2-controllers \
+    ros-humble-gazebo-ros2-control \
     python3-colcon-common-extensions \
     python3-rosdep \
     python3-pip \
@@ -30,7 +41,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies for Nav2 examples and SLAM metrics
-RUN pip3 install --no-cache-dir transforms3d numpy pillow pyyaml scipy
+RUN pip3 install --no-cache-dir transforms3d numpy pillow pyyaml scipy matplotlib
 
 # Create workspace
 WORKDIR /ros2_ws
