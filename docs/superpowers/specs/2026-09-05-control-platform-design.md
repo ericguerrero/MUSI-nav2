@@ -177,16 +177,64 @@ retargeting both from odometry-drift analysis to control tracking analysis:
 
 ### 3.4 Robot design path
 
-One worked Ackermann reference under `ros2_ws/src/robots/`: xacro description plus
-`libgazebo_ros_ackermann_drive.so`. Alongside it, a Nav2 parameter variant using
-`SmacPlannerHybrid` with a nonzero minimum turning radius, since the existing
-`nav2_params.yaml` is diff-drive-only.
+**Revised 2026-09-22 after a stack audit.** This section originally specified
+hand-authoring an Ackermann chassis around `libgazebo_ros_ackermann_drive.so`.
+That is the older Gazebo-plugin approach, and it was the wrong call: the image
+already ships `ros2_controllers`, which provides standard, YAML-configured
+controllers for every kinematics this course cares about.
 
-`docs/robot_design.md` documents the recipe for authoring a chassis.
+Verified present in `nav2_student:humble`:
+
+```
+libackermann_steering_controller.so     libmecanum_drive_controller.so
+libbicycle_steering_controller.so       libtricycle_steering_controller.so
+libdiff_drive_controller.so             libsteering_controllers_library.so
+```
+
+The Dockerfile now also installs `gazebo_ros2_control`, the bridge that lets
+those controllers drive Gazebo Classic, plus `ros2_control` and
+`ros2_controllers` explicitly rather than relying on them arriving as
+dependencies.
+
+This changes the shape of the deliverable. Swapping kinematics becomes a
+controller choice plus a YAML block, not a new hand-written Gazebo plugin
+section per chassis — which is both far less work for a student and the
+interface they will meet on real robots. `/cmd_vel` uniformity still holds:
+these controllers accept `Twist`, so a controller written against the Phase 2
+template survives a chassis change.
+
+Phase 3 therefore ships:
+
+- One worked Ackermann reference under `ros2_ws/src/robots/`: xacro description
+  with `ros2_control` hardware tags, driven by `ackermann_steering_controller`
+  through `gazebo_ros2_control`
+- A controller configuration YAML showing the diff-drive and Ackermann cases
+  side by side, so the difference is legible
+- A Nav2 parameter variant using `SmacPlannerHybrid` with a nonzero minimum
+  turning radius, since `nav2_params.yaml` is diff-drive-only *(stretch, per §9)*
+- `docs/robot_design.md`, the recipe for authoring a chassis
 
 One complete example proves the path works. Building a chassis library would
 remove the deliverable: authoring a robot for their chosen application *is* the
 student assignment.
+
+### 3.5 Stack currency (audited 2026-09-22)
+
+| Component | Installed | Note |
+|---|---|---|
+| ROS 2 Humble | — | EOL May 2027; valid for this cohort |
+| navigation2 | 1.1.19 (1.1.20 available) | repositories actively maintained |
+| ros2_control | 2.52.0 (2.54.2 available) | |
+| Gazebo Classic | 11.10.2 | **EOL since January 2025** |
+
+Gazebo Classic being unmaintained is the one real currency problem. Migrating to
+Jazzy plus Gazebo Harmonic is the correct long-term answer but means a full
+rebuild and revalidation of everything Phase 1 proved, which does not fit before
+an imminent semester. Revisit after this cohort.
+
+`nav2_mppi_controller` is installed and unused. It is a sampling-based MPC and a
+better centrepiece for a control course than DWB; worth surfacing in the docs
+even though nothing in this plan depends on it.
 
 ---
 
