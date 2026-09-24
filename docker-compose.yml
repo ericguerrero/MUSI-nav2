@@ -6,6 +6,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # build.sh sets these to the host user's ids so files written into the
+      # bind mounts stay editable on the host.
+      args:
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
     container_name: nav2_workspace
     network_mode: host
     privileged: true
@@ -19,7 +24,7 @@ services:
       - ./ros2_ws:/ros2_ws
       # X11 for GUI applications
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - ${HOME}/.Xauthority:/root/.Xauthority:ro
+      - ${HOME}/.Xauthority:/home/student/.Xauthority:ro
       # Shared resources
       - ./shared:/shared
     stdin_open: true

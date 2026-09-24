@@ -40,7 +40,7 @@ Found during the review that produced this design:
 | `ros2_ws/src/nav2.launch.py` | Docstring and defaults reference `ex3_2_spawn_robot.launch.py` and `nav2_params_ex3.yaml`; neither exists |
 | Working tree | `ros2_ws/src/replay_bag.launch.py` and `shared/scripts/` untracked and undecided |
 | `simulation.launch.py` spawn | `spawn_entity.py` waited 30 s for `/spawn_entity`, but Gazebo's ROS interface needs ~60 s here. **The robot never spawned.** Its error blames a missing factory plugin, which was in fact loaded — found in Phase 1, fixed in `00af895` |
-| `shared/worlds/*.world` | Three of four are root-owned on the host, created through the bind mount by the container running as root. Host-side edits fail with `PermissionError`; students will hit this. **Not yet fixed** — `chown` needs host `sudo` |
+| `shared/` and `ros2_ws/` | Everything the container wrote was root-owned on the host, because it ran as root — maps, bags, results, worlds. Students could not edit their own work without `sudo`. **Fixed 2026-09-24**: container runs as a `student` user with the host's UID/GID |
 
 ### 1.2 Stale branches
 

@@ -43,14 +43,29 @@ RUN apt-get update && apt-get install -y \
 # Install Python dependencies for Nav2 examples and SLAM metrics
 RUN pip3 install --no-cache-dir transforms3d numpy pillow pyyaml scipy matplotlib
 
-# Create workspace
-WORKDIR /ros2_ws
-RUN mkdir -p src
+# Run as a non-root user whose UID/GID match the host user. Everything written
+# into ./ros2_ws and ./shared lands on the host, and while the container ran as
+# root those files were root-owned: students could not edit or delete their own
+# maps, bags and results without sudo. build.sh passes the host's ids.
+#
+# Passwordless sudo is kept so students can still apt-get install whatever
+# libraries their project needs.
+ARG USER_UID=1000
+ARG USER_GID=1000
+RUN if ! getent group "${USER_GID}" >/dev/null; then groupadd --gid "${USER_GID}" student; fi \
+    && useradd --uid "${USER_UID}" --gid "${USER_GID}" --create-home --shell /bin/bash student \
+    && echo "student ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/student \
+    && chmod 0440 /etc/sudoers.d/student \
+    && mkdir -p /ros2_ws/src /shared \
+    && chown -R "${USER_UID}:${USER_GID}" /ros2_ws /shared
 
 # Environment setup for TurtleBot3
 ENV TURTLEBOT3_MODEL=waffle
 ENV GAZEBO_MODEL_PATH=/opt/ros/humble/share/turtlebot3_gazebo/models
 ENV ROS_DOMAIN_ID=0
+
+USER student
+WORKDIR /ros2_ws
 
 # Configure bashrc for automatic sourcing and welcome message
 RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc && \

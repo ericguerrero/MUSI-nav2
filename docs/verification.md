@@ -14,11 +14,12 @@ Each demo runs in its own fresh container, which is both what a student does and
 the only way to keep one demo's shutdown from corrupting the next one's checks.
 Logs land in `shared/verification_logs/`. The sweep takes about 20 minutes.
 
-## Results — 2026-09-22
+## Results — 2026-09-24
 
-Image `nav2_student:humble` rebuilt with `ros2_control`, `ros2_controllers`,
-`gazebo_ros2_control` and matplotlib. Re-run in full because a changed package
-set invalidates earlier evidence.
+Image `nav2_student:humble` with `ros2_control`, `ros2_controllers`,
+`gazebo_ros2_control` and matplotlib, running as the non-root `student` user.
+Re-run in full after each image change, since a changed image invalidates
+earlier evidence.
 
 | Demo | Result | What was checked |
 |---|---|---|
@@ -78,9 +79,20 @@ error, and `/model_states` never appears. It must be declared inside each world
 file's `<world>` element. All four world files now do, each with a comment saying
 why, because `-s` is the natural first guess.
 
-## Known issue, not yet fixed
+## Root-owned output — fixed 2026-09-24
 
-Three world files (`empty_world`, `turtlebot3_house`, `turtlebot3_world`) are
-root-owned on the host. They were created through the bind mount by the container,
-which runs as root, so host-side edits fail with `PermissionError`. Students
-editing a world will hit this. Fixing it needs `sudo chown` on the host.
+The container used to run as root, so **every** file it wrote into `./shared` and
+`./ros2_ws` — saved maps, bags, results, logs, even the world files — was
+root-owned on the host. Students could not edit or delete their own work without
+`sudo`.
+
+It now runs as a `student` user whose UID/GID match the host user; `build.sh`
+passes `$(id -u)` and `$(id -g)` at build time. Passwordless `sudo` remains inside
+the container for installing packages.
+
+`./tests/test_file_ownership.sh` checks this from the host. After the full sweep
+above ran as the new user, a scan found zero root-owned files in the repository.
+
+**Not covered by any test: the GUI.** Every check here is headless, and the
+Xauthority mount moved from `/root` to `/home/student`. Confirm Gazebo and RViz
+windows open with `./run.sh` on a real display.

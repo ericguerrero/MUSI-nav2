@@ -15,7 +15,10 @@ echo ""
 
 # Build with error checking
 echo "🐳 Building Docker image (this may take 5-10 minutes)..."
-docker build -t nav2_student:humble .
+docker build \
+    --build-arg USER_UID="$(id -u)" \
+    --build-arg USER_GID="$(id -g)" \
+    -t nav2_student:humble .
 
 if [ $? -eq 0 ]; then
     echo ""
