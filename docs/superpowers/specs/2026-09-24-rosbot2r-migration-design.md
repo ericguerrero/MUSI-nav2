@@ -1,9 +1,10 @@
 # ROSbot 2R Simulator Migration — Design
 
 **Date**: 2026-09-24
-**Status**: Approved, not yet implemented
+**Status**: Approved; M1 (ROSbot spawns in Gazebo Fortress) implemented 2026-11-14
 **Builds on**: `2026-09-05-control-platform-design.md` (Phases 1 and 2 complete)
-**Branch**: `feature/rosbot2r-migration`
+**Branch**: `feature/rosbot2r-simulation` (renamed from `feature/rosbot2r-migration`
+on 2026-11-14). Simulation only: robot-side work does not belong on this branch.
 
 ---
 
