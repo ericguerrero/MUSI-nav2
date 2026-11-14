@@ -1,0 +1,20 @@
+--- a/rosbot_description/urdf/rosbot.urdf.xacro
++++ b/rosbot_description/urdf/rosbot.urdf.xacro
+@@ -24,6 +24,10 @@
+       namespace="$(arg namespace)"
+       simulation_engine="$(arg simulation_engine)" />
+ 
++    <!-- MUSI-nav2: the simulated Astra renders colour and depth on the CPU and
++         halves the real-time factor on machines without a GPU. Control labs do
++         not use it, so it is off unless ROSBOT_CAMERA=true. -->
++    <xacro:if value="$(optenv ROSBOT_CAMERA false)">
+     <xacro:include filename="$(find ros_components_description)/urdf/orbbec_astra.urdf.xacro" ns="camera" />
+     <xacro:camera.orbbec_astra
+       parent_link="camera_link"
+@@ -31,5 +35,6 @@
+       rpy="0.0 0.0 0.0"
+       namespace="$(arg namespace)"
+       simulation_engine="$(arg simulation_engine)" />
++    </xacro:if>
+ 
+ </robot>
