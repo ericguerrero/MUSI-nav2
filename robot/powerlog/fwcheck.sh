@@ -24,6 +24,18 @@ if [ -n "$DRIVER_IMAGE" ] && [ "$DRIVER_IMAGE" != "$IMAGE" ]; then
     exit 1
 fi
 
+# On this robot a wall-clock step while the driver runs cuts the Pi's power
+# (see ~/stack.sh). The check restarts the driver, so with NTP on a step could
+# land right then and reset the Pi with the STM32 still in its bootloader.
+if [ "$(timedatectl show -p NTP --value 2>/dev/null)" = "yes" ]; then
+    echo "fwcheck: NTP is on and could step the clock during the check;" \
+        "run 'sudo timedatectl set-ntp false' first" >&2
+    exit 1
+fi
+
+# The driver is stopped and started here with plain docker commands, not with
+# ~/stack.sh: `stack.sh up` sets the clock and asks for a password, and this
+# restart must do neither.
 WAS_RUNNING="$(docker ps -q -f "name=^${DRIVER}$")"
 mkdir -p log
 

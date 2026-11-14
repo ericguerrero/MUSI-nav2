@@ -28,9 +28,14 @@ exit 0
 """
 
 
+STUB_TIMEDATECTL = """#!/usr/bin/env bash
+echo "${STUB_NTP:-no}"
+"""
+
+
 @pytest.fixture
 def robot_dir(tmp_path):
-    """A copy of what deploy.sh puts on the robot, plus the stub docker."""
+    """A copy of what deploy.sh puts on the robot, plus the stub commands."""
     work = tmp_path / "powerlog"
     work.mkdir()
     shutil.copy(POWERLOG / "fwcheck.sh", work)
@@ -40,6 +45,9 @@ def robot_dir(tmp_path):
     stub = stub_bin / "docker"
     stub.write_text(STUB_DOCKER)
     stub.chmod(0o755)
+    clock = stub_bin / "timedatectl"
+    clock.write_text(STUB_TIMEDATECTL)
+    clock.chmod(0o755)
     return work
 
 
@@ -112,6 +120,15 @@ def test_unreviewed_driver_image_is_refused_before_anything_is_stopped(robot_dir
     )
     assert done.returncode == 1
     assert "differs" in done.stderr
+    assert not any(line.startswith(("stop", "run", "start")) for line in lines)
+
+
+def test_refuses_while_ntp_could_step_the_clock(robot_dir):
+    done, lines = run_script(
+        robot_dir, STUB_DRIVER_IMAGE=PINNED, STUB_RUNNING=1, STUB_NTP="yes"
+    )
+    assert done.returncode == 1
+    assert "NTP" in done.stderr
     assert not any(line.startswith(("stop", "run", "start")) for line in lines)
 
 
