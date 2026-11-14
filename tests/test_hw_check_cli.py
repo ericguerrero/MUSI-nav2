@@ -1,5 +1,7 @@
 """Unit tests for the command line and reporting of the hardware check runner."""
 
+import math
+import struct
 import sys
 
 sys.path.insert(0, "/robot/hw_check")
@@ -11,11 +13,18 @@ from hw_check import (
     MOTOR_SEQUENCE,
     PAUSE_SECONDS,
     STOP_WAIT_SECONDS,
+    button_result,
+    depth_valid_fraction,
+    front_result,
+    hand_result,
+    led_result,
     mean_wheel_velocities,
     parse_args,
     require_wheels_off_ground,
     summarise,
 )
+
+NAN = float("nan")
 
 
 class TestParseArgs:
@@ -91,3 +100,78 @@ class TestMeanWheelVelocities:
 
     def test_returns_nothing_when_no_sample_is_recent_enough(self):
         assert mean_wheel_velocities([(1.0, {"fl_wheel_joint": 2.0})], since=5.0) == {}
+
+
+class TestDepthValidFraction:
+    def test_counts_non_zero_16uc1_pixels(self):
+        data = struct.pack("<4H", 0, 800, 0, 1200)
+        assert depth_valid_fraction(data, "16UC1") == pytest.approx(0.5)
+
+    def test_ignores_nan_in_32fc1(self):
+        data = struct.pack("<4f", NAN, 0.0, 1.5, 2.0)
+        assert depth_valid_fraction(data, "32FC1") == pytest.approx(0.5)
+
+    def test_an_empty_frame_has_no_valid_pixel(self):
+        assert depth_valid_fraction(b"", "16UC1") == 0.0
+
+    def test_rejects_an_encoding_it_cannot_read(self):
+        with pytest.raises(ValueError):
+            depth_valid_fraction(b"\x00\x00", "rgb8")
+
+
+class TestLedResult:
+    def test_fails_when_the_operator_answers_no(self):
+        row = led_result("left", answer="n")
+        assert not row.passed
+        assert row.name == "led/left"
+
+    def test_passes_when_the_operator_answers_yes(self):
+        assert led_result("right", answer=" Y ").passed
+
+
+class TestHandResult:
+    def test_passes_when_the_reading_drops_below_the_hand_distance(self):
+        row = hand_result("fl", baseline=0.45, readings=[0.44, 0.30, 0.09])
+        assert row.passed
+        assert row.name == "hand range/fl"
+
+    def test_open_space_then_a_hand_passes(self):
+        # nan is how the firmware reports nothing in range.
+        assert hand_result("rl", baseline=NAN, readings=[NAN, NAN, 0.12]).passed
+
+    def test_fails_when_the_reading_never_drops(self):
+        assert not hand_result("rl", baseline=NAN, readings=[NAN, NAN, NAN]).passed
+
+    def test_fails_when_something_was_already_that_close(self):
+        # Without a far baseline a near reading proves nothing about the hand.
+        row = hand_result("fr", baseline=0.10, readings=[0.10, 0.09])
+        assert not row.passed
+        assert "clear" in row.detail
+
+
+class TestButtonResult:
+    def test_passes_when_a_press_arrives(self):
+        assert button_result("left", [False, True]).passed
+
+    def test_fails_when_nothing_arrives(self):
+        row = button_result("left", [])
+        assert not row.passed
+        assert row.name == "button/left"
+
+    def test_fails_but_says_so_when_only_false_arrives(self):
+        row = button_result("right", [False, False])
+        assert not row.passed
+        assert "never true" in row.detail
+
+
+class TestFrontResult:
+    def test_passes_when_the_object_is_seen_ahead(self):
+        assert front_result(math.radians(8)).passed
+
+    def test_fails_when_the_object_is_seen_behind(self):
+        row = front_result(math.radians(178))
+        assert not row.passed
+        assert "178" in row.detail
+
+    def test_fails_when_nothing_is_within_a_metre(self):
+        assert not front_result(None).passed

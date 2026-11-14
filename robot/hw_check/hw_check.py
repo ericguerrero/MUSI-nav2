@@ -11,7 +11,9 @@ its wall time is wrong without internet, so message stamps cannot be trusted.
 """
 
 import argparse
+import array
 import json
+import math
 import sys
 import time
 from collections import defaultdict
@@ -23,11 +25,16 @@ from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from sensor_msgs.msg import BatteryState, Imu, JointState, LaserScan, Range
+from rclpy.time import Time
+from sensor_msgs.msg import BatteryState, Image, Imu, JointState, LaserScan, Range
+from std_msgs.msg import Bool
+from tf2_ros import Buffer, TransformException, TransformListener
 
 from checks import (
     MAX_ANGULAR,
     MAX_LINEAR,
+    CheckResult,
+    check_depth_image,
     check_imu_stationary,
     check_joint_names,
     check_range_reading,
@@ -38,6 +45,7 @@ from checks import (
     check_voltage,
     check_wheel_response,
     expected_wheel_velocities,
+    nearest_bearing_in_base,
 )
 
 STAGES = ("sensors", "motors", "interactive", "camera")
@@ -70,6 +78,19 @@ STOP_WAIT_SECONDS = 1.0
 COMMAND_PERIOD = 0.05
 # Wheel speed is averaged over the end of a segment, after the ramp-up.
 AVERAGING_SECONDS = 2.0
+
+HAND_DISTANCE = 0.20
+PROMPT_TIMEOUT = 15.0
+FRONT_BEARING_LIMIT = math.radians(20)
+SIDES = ("left", "right")
+RANGE_LABELS = {"fl": "front left", "fr": "front right",
+                "rl": "rear left", "rr": "rear right"}
+
+# Names published by husarion/astra with device_namespace:=camera.
+COLOR_TOPIC = "/camera/color/image_raw"
+DEPTH_TOPIC = "/camera/depth/image_raw"
+CAMERA_RATE_HZ = 30.0
+DEPTH_ARRAY_CODES = {"16UC1": "H", "32FC1": "f"}
 
 
 def parse_args(argv: list) -> argparse.Namespace:
@@ -260,15 +281,166 @@ def run_motors(sampler: Sampler, args, ask=input) -> list:
     return results
 
 
-STAGE_RUNNERS = {"sensors": run_sensors, "motors": run_motors}
+def hand_result(sensor: str, baseline: float, readings: list) -> CheckResult:
+    name = f"hand range/{sensor}"
+    if math.isfinite(baseline) and baseline < HAND_DISTANCE:
+        # Without a far baseline a near reading proves nothing about the hand.
+        return CheckResult(name, False,
+                           f"already {baseline:.2f} m before the hand: clear the space "
+                           "in front of the sensor and run again")
+    near = [r for r in readings if math.isfinite(r) and r < HAND_DISTANCE]
+    if near:
+        return CheckResult(name, True, f"dropped to {min(near):.3f} m")
+    return CheckResult(name, False,
+                       f"never below {HAND_DISTANCE:.2f} m in {PROMPT_TIMEOUT:g} s")
+
+
+def button_result(side: str, values: list) -> CheckResult:
+    name = f"button/{side}"
+    if not values:
+        return CheckResult(name, False, f"no message in {PROMPT_TIMEOUT:g} s")
+    if any(values):
+        return CheckResult(name, True, "press received")
+    return CheckResult(name, False, "messages received but never true")
+
+
+def led_result(side: str, answer: str) -> CheckResult:
+    seen = answer.strip().lower() in ("y", "yes")
+    return CheckResult(f"led/{side}", seen,
+                       "operator saw it light" if seen else "operator did not see it light")
+
+
+def front_result(bearing) -> CheckResult:
+    if bearing is None:
+        return CheckResult("lidar front", False, "no return within 1 m")
+    degrees = math.degrees(bearing)
+    return CheckResult("lidar front", abs(bearing) < FRONT_BEARING_LIMIT,
+                       f"nearest object at {degrees:.0f} deg from the robot's front")
+
+
+def depth_valid_fraction(data: bytes, encoding: str) -> float:
+    """Share of depth pixels that carry a measurement."""
+    code = DEPTH_ARRAY_CODES.get(encoding)
+    if code is None:
+        raise ValueError(f"unsupported depth encoding '{encoding}'")
+    pixels = array.array(code)
+    pixels.frombytes(bytes(data))
+    if not pixels:
+        return 0.0
+    # nan fails the comparison, so it is counted as no measurement.
+    return sum(1 for p in pixels if p > 0 and math.isfinite(p)) / len(pixels)
+
+
+def _new_messages(sampler: Sampler, topic: str, done, timeout: float) -> list:
+    """Messages that arrive on a kept topic from now on, until one satisfies
+    `done` or the timeout passes."""
+    start = len(sampler.history(topic))
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        sampler.collect(0.1)
+        fresh = [msg for _, msg in sampler.history(topic)[start:]]
+        if any(done(msg) for msg in fresh):
+            return fresh
+    return [msg for _, msg in sampler.history(topic)[start:]]
+
+
+def _hand_rows(sampler: Sampler) -> list:
+    rows = []
+    for sensor in RANGE_SENSORS:
+        topic = f"/range/{sensor}"
+        latest = sampler.last(topic)
+        baseline = latest.range if latest is not None else math.nan
+        print(f"Hold a hand about 10 cm in front of the {RANGE_LABELS[sensor]} "
+              f"distance sensor ({PROMPT_TIMEOUT:g} s)...", flush=True)
+        fresh = _new_messages(sampler, topic, lambda m: m.range < HAND_DISTANCE,
+                              PROMPT_TIMEOUT)
+        rows.append(hand_result(sensor, baseline, [m.range for m in fresh]))
+        print(f"  {rows[-1].detail}", flush=True)
+    return rows
+
+
+def _button_rows(sampler: Sampler) -> list:
+    rows = []
+    for side in SIDES:
+        print(f"Press the {side} button on the rear panel ({PROMPT_TIMEOUT:g} s)...",
+              flush=True)
+        fresh = _new_messages(sampler, f"/button/{side}", lambda m: m.data,
+                              PROMPT_TIMEOUT)
+        rows.append(button_result(side, [m.data for m in fresh]))
+        print(f"  {rows[-1].detail}", flush=True)
+    return rows
+
+
+def _led_rows(sampler: Sampler, ask) -> list:
+    rows = []
+    for side in SIDES:
+        publisher = sampler.create_publisher(Bool, f"/led/{side}", 10)
+        sampler.collect(1.0)  # let discovery connect the publisher to the firmware
+        publisher.publish(Bool(data=True))
+        sampler.collect(0.5)
+        rows.append(led_result(side, ask(f"Is the {side} green LED on? [y/n] ")))
+        publisher.publish(Bool(data=False))
+        sampler.collect(0.5)
+    return rows
+
+
+def _front_row(sampler: Sampler, ask) -> CheckResult:
+    buffer = Buffer()
+    listener = TransformListener(buffer, sampler)
+    ask("Place a box 0.5 m in front of the robot, nothing else within 1 m, "
+        "then press Enter. ")
+    sampler.collect(2.0)
+    scan = sampler.last("/scan")
+    if scan is None:
+        return CheckResult("lidar front", False, "no /scan message")
+    try:
+        rotation = buffer.lookup_transform(
+            "base_link", scan.header.frame_id, Time()).transform.rotation
+    except TransformException as error:
+        return CheckResult("lidar front", False, f"no transform to base_link: {error}")
+    finally:
+        listener.unregister()
+    laser_yaw = math.atan2(2 * (rotation.w * rotation.z + rotation.x * rotation.y),
+                           1 - 2 * (rotation.y ** 2 + rotation.z ** 2))
+    return front_result(nearest_bearing_in_base(
+        list(scan.ranges), scan.angle_min, scan.angle_increment, laser_yaw))
+
+
+def run_interactive(sampler: Sampler, args, ask=input) -> list:
+    for sensor in RANGE_SENSORS:
+        sampler.watch(f"/range/{sensor}", Range, keep=True)
+    for side in SIDES:
+        sampler.watch(f"/button/{side}", Bool, keep=True)
+    sampler.watch("/scan", LaserScan)
+    sampler.collect(2.0)
+    return (_hand_rows(sampler) + _button_rows(sampler) + _led_rows(sampler, ask)
+            + [_front_row(sampler, ask)])
+
+
+def run_camera(sampler: Sampler, args) -> list:
+    sampler.watch(COLOR_TOPIC, Image)
+    sampler.watch(DEPTH_TOPIC, Image)
+    print(f"Sampling the camera for {args.window:g} s.", flush=True)
+    sampler.collect(args.window)
+    results = [check_rate(topic, sampler.times(topic), CAMERA_RATE_HZ, 0.50)
+               for topic in (COLOR_TOPIC, DEPTH_TOPIC)]
+    depth = sampler.last(DEPTH_TOPIC)
+    if depth is None:
+        return results
+    try:
+        fraction = depth_valid_fraction(depth.data, depth.encoding)
+    except ValueError as error:
+        return results + [CheckResult("depth image", False, str(error))]
+    return results + [check_depth_image(fraction, depth.width, depth.height)]
+
+
+STAGE_RUNNERS = {"sensors": run_sensors, "motors": run_motors,
+                 "interactive": run_interactive, "camera": run_camera}
 
 
 def main(argv: list) -> int:
     args = parse_args(argv)
-    runner = STAGE_RUNNERS.get(args.stage)
-    if runner is None:
-        print(f"stage '{args.stage}' is not implemented yet", file=sys.stderr)
-        return 2
+    runner = STAGE_RUNNERS[args.stage]
     rclpy.init()
     sampler = Sampler()
     try:
