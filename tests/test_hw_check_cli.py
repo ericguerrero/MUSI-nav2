@@ -12,6 +12,8 @@ from checks import MAX_ANGULAR, MAX_LINEAR, CheckResult
 from hw_check import (
     MOTOR_SEQUENCE,
     PAUSE_SECONDS,
+    STAGE_RUNNERS,
+    STAGES,
     STOP_WAIT_SECONDS,
     button_result,
     depth_valid_fraction,
@@ -45,6 +47,16 @@ class TestParseArgs:
 
     def test_the_sampling_window_defaults_to_ten_seconds(self):
         assert parse_args(["--stage", "sensors"]).window == 10.0
+
+    def test_distance_is_a_stage_of_its_own(self):
+        # The lidar-front check needs the robot placed in a clear area, so it
+        # is run in a second pass without repeating hands, buttons and LEDs.
+        args = parse_args(["--stage", "distance"])
+        assert args.stage == "distance"
+        assert args.report == "/out/distance.json"
+
+    def test_every_stage_has_a_runner(self):
+        assert set(STAGE_RUNNERS) == set(STAGES)
 
 
 class TestSummarise:

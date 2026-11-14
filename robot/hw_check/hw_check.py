@@ -48,7 +48,10 @@ from checks import (
     nearest_bearing_in_base,
 )
 
-STAGES = ("sensors", "motors", "interactive", "camera")
+# "distance" and "camera" need the robot placed in a clear area; the other
+# three can be run where it stands. So they are separate stages, and a second
+# pass does not repeat hands, buttons and LEDs.
+STAGES = ("sensors", "motors", "interactive", "distance", "camera")
 RANGE_SENSORS = ("fl", "fr", "rl", "rr")
 
 # (topic, message type, expected rate in Hz, relative tolerance), as measured
@@ -415,10 +418,14 @@ def run_interactive(sampler: Sampler, args, ask=input) -> list:
         sampler.watch(f"/range/{sensor}", Range, keep=True)
     for side in SIDES:
         sampler.watch(f"/button/{side}", Bool, keep=True)
+    sampler.collect(2.0)
+    return _hand_rows(sampler) + _button_rows(sampler) + _led_rows(sampler, ask)
+
+
+def run_distance(sampler: Sampler, args, ask=input) -> list:
     sampler.watch("/scan", LaserScan)
     sampler.collect(2.0)
-    return (_hand_rows(sampler) + _button_rows(sampler) + _led_rows(sampler, ask)
-            + [_front_row(sampler, ask)])
+    return [_front_row(sampler, ask)]
 
 
 def run_camera(sampler: Sampler, args) -> list:
@@ -439,7 +446,8 @@ def run_camera(sampler: Sampler, args) -> list:
 
 
 STAGE_RUNNERS = {"sensors": run_sensors, "motors": run_motors,
-                 "interactive": run_interactive, "camera": run_camera}
+                 "interactive": run_interactive, "distance": run_distance,
+                 "camera": run_camera}
 
 
 def main(argv: list) -> int:
