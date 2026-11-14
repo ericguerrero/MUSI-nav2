@@ -1,0 +1,26 @@
+# Power log for the ROSbot 2R. Its own Compose project, so the driver stack
+# in ~/compose.yaml is never touched by `docker compose` commands run here.
+name: powerlog
+
+services:
+  powerlog:
+    # Same image as the driver: it is already on the robot (no internet
+    # there) and holds rclpy.
+    image: husarion/rosbot:humble-0.14.0-20250319
+    container_name: powerlog
+    # host network and ipc: required to see the driver's DDS topics.
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    # Kernel under-voltage events come from /dev/kmsg, which needs SYSLOG.
+    cap_add: [SYSLOG]
+    devices: [/dev/kmsg]
+    stop_grace_period: 5s
+    # The image's health check is a timer stub that says nothing about this
+    # process; without this Docker would report the logger "unhealthy".
+    healthcheck:
+      disable: true
+    volumes:
+      - ./:/powerlog:ro
+      - ./log:/log
+    command: python3 /powerlog/powerlog.py
