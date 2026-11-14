@@ -13,7 +13,8 @@ ROBOT_HOST="${ROBOT_HOST:-husarion@192.168.77.2}"
 IMAGE="husarion/rosbot:humble-0.14.0-20250319"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-ssh "${ROBOT_HOST}" "mkdir -p hw_check hw_check_out" || exit 2
+# -n: this call must not swallow input meant for the stage's prompts.
+ssh -n "${ROBOT_HOST}" "mkdir -p hw_check hw_check_out" || exit 2
 scp -q "${HERE}"/hw_check/*.py "${ROBOT_HOST}:hw_check/" || exit 2
 
 # -tt gives the interactive stages a terminal for their prompts, and forces one
