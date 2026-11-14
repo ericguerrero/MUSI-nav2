@@ -66,7 +66,16 @@ is coupled to the simulator, which is what makes this migration affordable.
 
 ### 2.1 The robot's interface
 
-Husarion documents one topic set for simulation and hardware in
+**Revised 2026-11-14 after the robot was brought up.** The contract is the
+topic list measured on the lab robot (driver `husarion/rosbot:humble-0.14.0-20250319`),
+not the list in `ROS_API.md` below, which names topics the robot does not
+publish. Measured and required in simulation: `/cmd_vel`, `/odometry/filtered`,
+`/imu_broadcaster/imu`, `/joint_states`, `/scan`, `/tf`, `/tf_static`. The
+robot also publishes `/battery`; there is no `imu/data`, `battery_state` or
+`odometry/wheels` (the wheel odometry is `/rosbot_base_controller/odom`).
+`tests/test_rosbot_sim_contract.sh` checks this list.
+
+Original text, superseded: Husarion documents one topic set for simulation and hardware in
 `rosbot_ros@humble/ROS_API.md`. Both targets publish:
 
 `cmd_vel`, `scan`, `scan_filtered`, `odometry/filtered`, `odometry/wheels`,
@@ -90,6 +99,29 @@ with the robot.
 ## 3. Components
 
 ### 3.1 Container (`Dockerfile`)
+
+**Revised 2026-11-14 during M1.** Three findings changed this section:
+
+- **Building from source is no longer possible at the robot's version.** The
+  robot runs the image built from `rosbot_ros` commit `c860d02` (the `0.14.0`
+  tag is older and differs). That commit pins `husarion/ros_components_description`,
+  which now returns 404; the renamed `husarion_components_description` does not
+  hold the pinned commit. The Dockerfile therefore copies `/ros2_ws/install`
+  from `husarion/rosbot-gazebo:humble-0.14.0-20250319`, pinned by digest, into
+  `/opt/rosbot_ws/install`. Same binaries as the robot's driver.
+- **The camera halves simulation speed.** Without a GPU the Astra renders on
+  the CPU: real-time factor 0.15–0.52 on atlas with it, 0.84–1.00 without.
+  `patches/rosbot_ros/0001-optional-camera.patch` makes it conditional on
+  `ROSBOT_CAMERA`, off by default.
+- **Only two runtime packages are missing** from `humble-desktop-full`:
+  `ros-humble-ign-ros2-control` and `ros-humble-robot-localization`. They are
+  listed by hand; `rosdep install` over the install tree finds nothing because
+  of colcon's `COLCON_IGNORE`.
+
+Classic is not removed in M1. TurtleBot3 and `gazebo_ros` stay until the
+students move over, so the existing demos keep working; removal moves to M4.
+
+Original plan, superseded where it conflicts with the above.
 
 Remove:
 
