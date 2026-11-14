@@ -80,20 +80,37 @@ def _leave_bootloader(flasher) -> None:
         flasher.exit_bootloader_mode()
 
 
-def check(flasher, ref: bytes, out: Path, run: Callable = subprocess.run) -> dict:
+def _no_note(_step: str) -> None:
+    pass
+
+
+def check(
+    flasher,
+    ref: bytes,
+    out: Path,
+    run: Callable = subprocess.run,
+    note: Callable[[str], None] = _no_note,
+) -> dict:
     """Read `len(ref)` bytes back through the bootloader and compare.
     `flasher` gives the port and the bootloader pin sequence. The bootloader
-    is left whatever happens, including a failure half way into entering it."""
+    is left whatever happens, including a failure half way into entering it.
+    `note` is told each step: if the Pi resets during the check, the last
+    note on disk says how far it got."""
     try:
+        note("entering bootloader")
         flasher.enter_bootloader_mode()
         done = run(
             read_command(flasher.port, len(ref), out),
             capture_output=True, text=True, timeout=READ_TIMEOUT_S,
         )
+        note("read finished")
     except subprocess.TimeoutExpired:
         return {"result": "READ FAILED", "detail": f"no answer in {READ_TIMEOUT_S} s"}
     finally:
+        # Nothing may come before this: a note that fails or is interrupted
+        # must not keep the chip in its bootloader.
         _leave_bootloader(flasher)
+        note("left bootloader")
     if done.returncode != 0:
         lines = (done.stdout + done.stderr).strip().splitlines()
         return {"result": "READ FAILED", "detail": lines[-1] if lines else ""}
@@ -120,15 +137,28 @@ def load_flasher(reference: Path):
     return module.FirmwareFlasher(str(reference))
 
 
+def _stamped(fields: dict) -> dict:
+    return {"wall": wall(), "boot": boot_id(), "up": round(uptime(), 1), **fields}
+
+
+def save_step(step: str) -> None:
+    """Steps are evidence for a reset, not part of the check: a step that
+    cannot be saved must not stop it."""
+    try:
+        append_result(RESULTS, _stamped({"step": step}))
+    except OSError:
+        pass
+
+
 def main(run: Callable = subprocess.run) -> int:
     raise_on_signals()
     try:
         flasher = load_flasher(REFERENCE)
-        result = check(flasher, REFERENCE.read_bytes(), READ_BACK, run)
+        result = check(flasher, REFERENCE.read_bytes(), READ_BACK, run, save_step)
     except (OSError, ImportError, AttributeError, TypeError, Interrupted) as error:
         print(f"fwcheck: cannot run, no verdict: {error!r}", file=sys.stderr)
         return EXIT_ERROR
-    record = {"wall": wall(), "boot": boot_id(), "up": round(uptime(), 1), **result}
+    record = _stamped(result)
     # Printed before it is saved: a full card must not cost the verdict.
     print(json.dumps(record))
     print(f"fwcheck: {result['result']}")

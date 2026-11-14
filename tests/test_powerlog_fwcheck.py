@@ -109,6 +109,51 @@ def test_check_match_brackets_the_read_with_the_bootloader(tmp_path):
     assert flasher.calls == ["enter", "read", "exit"]
 
 
+def test_check_notes_each_bootloader_step(tmp_path):
+    flasher = FakeFlasher()
+    ref = b"\x10"
+    fwcheck.check(
+        flasher, ref, tmp_path / "read.bin", fake_stm32flash(flasher, ref),
+        note=lambda step: flasher.calls.append(f"note: {step}"),
+    )
+    assert flasher.calls == [
+        "note: entering bootloader", "enter", "read", "note: read finished",
+        "exit", "note: left bootloader",
+    ]
+
+
+def test_check_leaves_bootloader_before_anything_else_when_a_note_is_interrupted(tmp_path):
+    flasher = FakeFlasher()
+
+    def note(step):
+        if step == "read finished":
+            raise fwcheck.Interrupted("SIGTERM")
+
+    with pytest.raises(fwcheck.Interrupted):
+        fwcheck.check(flasher, b"\x10", tmp_path / "r.bin", fake_stm32flash(flasher, b"\x10"), note)
+    assert flasher.calls == ["enter", "read", "exit"]
+
+
+def test_main_saves_the_steps_with_uptime_before_the_verdict(restored_signals, robot_files):
+    fwcheck.main(fake_stm32flash(robot_files, b"\x10\x20\x30"))
+    saved = [json.loads(line) for line in fwcheck.RESULTS.read_text().splitlines()]
+    assert [r.get("step") for r in saved[:3]] == [
+        "entering bootloader", "read finished", "left bootloader",
+    ]
+    assert all("up" in r and "boot" in r for r in saved)
+    assert saved[3]["result"] == "MATCH"
+
+
+def test_main_runs_the_check_even_if_steps_cannot_be_saved(
+    restored_signals, robot_files, monkeypatch, tmp_path, capsys
+):
+    blocker = tmp_path / "blocker"
+    blocker.write_text("")
+    monkeypatch.setattr(fwcheck, "RESULTS", blocker / "fwcheck.jsonl")
+    assert fwcheck.main(fake_stm32flash(robot_files, b"\x10\x20\x30")) == 0
+    assert robot_files.calls == ["enter", "read", "exit"]
+
+
 def test_check_mismatch(tmp_path):
     flasher = FakeFlasher()
     run = fake_stm32flash(flasher, b"\x10\xff\x30")
@@ -188,7 +233,7 @@ def test_main_match(restored_signals, robot_files, capsys):
     run = fake_stm32flash(robot_files, b"\x10\x20\x30")
     assert fwcheck.main(run) == 0
     assert "fwcheck: MATCH" in capsys.readouterr().out
-    saved = json.loads(fwcheck.RESULTS.read_text())
+    saved = json.loads(fwcheck.RESULTS.read_text().splitlines()[-1])
     assert saved["result"] == "MATCH"
     assert {"wall", "boot", "up"} <= set(saved)
 

@@ -68,8 +68,10 @@ in use. It refuses to run if the driver uses another image than the pinned one.
 | `READ FAILED` | 3 | The bootloader did not answer or refused the read. Not a verdict. |
 | (none) | 1 | The check could not run. Not a verdict. |
 
-Results are appended to `~/powerlog/log/fwcheck.jsonl`. If power is lost during a check the
-driver stays stopped after the next boot: start it with `docker start rosbot`.
+Results are appended to `~/powerlog/log/fwcheck.jsonl`, after one line per bootloader step
+with its uptime, so a reset during a check can be placed. If power is lost during a check the
+driver stays stopped after the next boot: start it with `~/stack.sh up`, which also sets the
+clock while the driver is down.
 
 ## Limits
 
