@@ -15,6 +15,9 @@ from typing import Iterable, List, Optional
 import store
 
 GAP_S = 10.0
+# /battery arrives every 0.4 s; a reading older than this means messages
+# stopped, even while the logger still repeats the last value.
+STALE_S = 1.5
 
 
 def _new_boot(record: dict) -> dict:
@@ -28,6 +31,7 @@ def _new_boot(record: dict) -> dict:
         "batt_min": None,
         "batt_max": None,
         "batt_last": None,
+        "kmsg": True,
         "uv_events": [],
         "no_batt": [],
         "gaps": [],
@@ -38,6 +42,17 @@ def _new_boot(record: dict) -> dict:
     }
 
 
+def _silent_since(record: dict) -> Optional[float]:
+    """Uptime at which /battery went quiet, or None if this sample is fresh.
+    Dated from the last reading, which is when the STM32 actually stopped."""
+    up, age = record["up"], record.get("age")
+    if record.get("batt") is None:
+        return up if age is None else round(up - age, 1)
+    if age is not None and age > STALE_S:
+        return round(up - age, 1)
+    return None
+
+
 def _add_sample(boot: dict, record: dict) -> None:
     up = record["up"]
     previous = boot["_last_sample_up"]
@@ -45,15 +60,17 @@ def _add_sample(boot: dict, record: dict) -> None:
         boot["gaps"].append((previous, up))
     boot["_last_sample_up"] = up
     boot["samples"] += 1
+    since = _silent_since(record)
+    if since is None:
+        boot["_silent_from"] = None
+    elif boot["_silent_from"] is None:
+        boot["_silent_from"] = since
+        boot["no_batt"].append((since, up))
+    else:
+        boot["no_batt"][-1] = (boot["_silent_from"], up)
     batt = record.get("batt")
     if batt is None:
-        if boot["_silent_from"] is None:
-            boot["_silent_from"] = up
-            boot["no_batt"].append((up, up))
-        else:
-            boot["no_batt"][-1] = (boot["_silent_from"], up)
         return
-    boot["_silent_from"] = None
     boot["batt_last"] = batt
     boot["batt_min"] = batt if boot["batt_min"] is None else min(boot["batt_min"], batt)
     boot["batt_max"] = batt if boot["batt_max"] is None else max(boot["batt_max"], batt)
@@ -75,6 +92,8 @@ def _add(boot: dict, record: dict) -> None:
         _add_sample(boot, record)
     elif record.get("t") == "uv":
         _add_uv(boot, record)
+    elif record.get("t") == "start" and record.get("kmsg") is False:
+        boot["kmsg"] = False
 
 
 def summarise(records: Iterable[dict]) -> List[dict]:
@@ -113,6 +132,8 @@ def _render_boot(boot: dict) -> List[str]:
         f"  battery V  min {_volts(boot['batt_min'])} max {_volts(boot['batt_max'])}"
         f" last {_volts(boot['batt_last'])}",
     ]
+    if not boot["kmsg"]:
+        lines.append("  kernel log not readable: under-voltage events were not recorded")
     for event in boot["uv_events"]:
         name = "under-voltage" if event["low"] else "voltage normal"
         lines.append(f"  {name} at {event['up']:.1f} s")

@@ -4,7 +4,7 @@ Pure functions, standard library only, so they are tested off the robot.
 Events are ordered by boot ID and `up` (seconds since boot). `wall` is kept
 for reading only: the robot has no RTC and its clock is wrong after a boot.
 """
-from typing import Iterable, Optional
+from typing import Iterable, List, Optional
 
 BATT_MAX_AGE = 5.0
 
@@ -40,11 +40,14 @@ def sample(
     drv: bool,
 ) -> dict:
     """One periodic sample. A battery reading older than BATT_MAX_AGE is null:
-    a silent STM32 must not look like a steady voltage."""
-    if batt is None or batt_age is None or batt_age > BATT_MAX_AGE:
-        fresh_batt = None
+    a silent STM32 must not look like a steady voltage. `age` is kept either
+    way, so the log shows when the readings stopped, not only that they did."""
+    if batt is None or batt_age is None:
+        fresh_batt, age = None, None
+    elif batt_age > BATT_MAX_AGE:
+        fresh_batt, age = None, round(batt_age, 1)
     else:
-        fresh_batt = round(batt, 2)
+        fresh_batt, age = round(batt, 2), round(batt_age, 1)
     return {
         "t": "s",
         "boot": boot,
@@ -52,6 +55,7 @@ def sample(
         "wall": wall,
         "uv": uv,
         "batt": fresh_batt,
+        "age": age,
         "drv": drv,
     }
 
@@ -89,14 +93,16 @@ def _previous_end(boot: str, tail: list) -> Optional[dict]:
     }
 
 
-def start(boot: str, up: float, wall: str, tail: list) -> dict:
+def start(boot: str, up: float, wall: str, tail: list, kmsg: bool) -> dict:
     """The first record of a run. `tail` is the end of the log already on
-    disk; `prev` says how the run before this one ended."""
+    disk; `prev` says how the run before this one ended. `kmsg` false means
+    the kernel log is unreadable, so "no under-voltage events" proves nothing."""
     return {
         "t": "start",
         "boot": boot,
         "up": round(up, 1),
         "wall": wall,
+        "kmsg": kmsg,
         "prev": _previous_end(boot, tail),
     }
 
@@ -116,3 +122,9 @@ def max_uv_seq(records: Iterable[dict], boot: str) -> int:
     """Highest kernel sequence number already logged for `boot`, or -1."""
     seqs = [r["seq"] for r in records if r.get("t") == "uv" and r.get("boot") == boot]
     return max(seqs, default=-1)
+
+
+def unseen(events: List[dict], seen_seq: int) -> List[dict]:
+    """Kernel events newer than the last one logged, so a container restart
+    does not write the ring buffer's old events again."""
+    return [event for event in events if event["seq"] > seen_seq]

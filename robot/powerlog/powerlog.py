@@ -6,7 +6,6 @@ alarm, the 12 V input as the STM32 reports it on /battery, and whether the
 driver is up. Kernel under-voltage events are copied with their kernel time.
 It only listens; it never writes to the STM32 or its UART.
 """
-import os
 import signal
 import sys
 import time
@@ -22,13 +21,12 @@ from sensor_msgs.msg import BatteryState
 import records
 import store
 from hostinfo import boot_id, uptime, wall
+from kmsg import Kmsg
 
 PERIOD = 2.0
 LOG_DIR = Path("/log")
 BATT_TOPIC = "/battery"
 DRIVER_NODE = "controller_manager"
-KMSG = "/dev/kmsg"
-KMSG_RECORD_MAX = 8192
 
 
 def find_uv_alarm() -> Optional[Path]:
@@ -48,41 +46,16 @@ def read_alarm(path: Optional[Path]) -> Optional[bool]:
         return None
 
 
-class Kmsg:
-    """Non-blocking reader of the kernel ring buffer, from its start, so
-    events from before the container started are still seen."""
-
-    def __init__(self, path: str = KMSG):
-        try:
-            self._fd: Optional[int] = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
-        except OSError:
-            self._fd = None
-
-    def poll(self) -> List[dict]:
-        """Under-voltage events that arrived since the last call."""
-        events: List[dict] = []
-        while self._fd is not None:
-            try:
-                data = os.read(self._fd, KMSG_RECORD_MAX)
-            except BlockingIOError:
-                break
-            except BrokenPipeError:
-                # Records were overwritten before we read them; go on.
-                continue
-            event = records.parse_kmsg(data.decode(errors="replace"))
-            if event is not None:
-                events.append(event)
-        return events
-
-
 class PowerLog(Node):
-    def __init__(self, writer: store.LogWriter, boot: str, seen_uv_seq: int):
+    def __init__(
+        self, writer: store.LogWriter, boot: str, kmsg: Kmsg, seen_uv_seq: int
+    ):
         super().__init__("powerlog")
         self._writer = writer
         self._boot = boot
+        self._kmsg = kmsg
         self._seen_uv_seq = seen_uv_seq
         self._alarm = find_uv_alarm()
-        self._kmsg = Kmsg()
         self._batt: Optional[float] = None
         self._batt_up: Optional[float] = None
         self.create_subscription(
@@ -94,10 +67,9 @@ class PowerLog(Node):
         self._batt_up = uptime()
 
     def tick(self) -> None:
-        for event in self._kmsg.poll():
-            if event["seq"] > self._seen_uv_seq:
-                self._seen_uv_seq = event["seq"]
-                self._writer.append(records.uv_event(self._boot, wall(), event))
+        for event in records.unseen(self._kmsg.poll(), self._seen_uv_seq):
+            self._seen_uv_seq = event["seq"]
+            self._writer.append(records.uv_event(self._boot, wall(), event))
         now = uptime()
         age = None if self._batt_up is None else now - self._batt_up
         self._writer.append(
@@ -134,11 +106,12 @@ def main() -> int:
     boot = boot_id()
     tail = store.tail(LOG_DIR)
     seen = seen_uv_seq(boot)
+    kmsg = Kmsg()
     with store.LogWriter(LOG_DIR) as writer:
         # Written before ROS starts: a boot is on record even if ROS fails.
-        writer.append(records.start(boot, uptime(), wall(), tail))
+        writer.append(records.start(boot, uptime(), wall(), tail, kmsg.available))
         rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
-        node = PowerLog(writer, boot, seen)
+        node = PowerLog(writer, boot, kmsg, seen)
         # Paced by the monotonic clock, not a ROS timer: the robot's wall
         # clock steps by hours when NTP arrives, which would stall a timer.
         # The first sample waits one period so /battery has time to be
