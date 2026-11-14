@@ -66,6 +66,8 @@ Every 2 s it appends one JSON line to `~/powerlog/log/powerlog.jsonl` and calls 
 | `wall` | UTC wall clock, for reading only |
 | `uv` | `rpi_volt` alarm bit: under-voltage in the last 2 s |
 | `batt` | last `/battery` voltage, or `null` if none arrived in the last 5 s |
+| `age` | age of that reading in seconds; shows when the STM32 went quiet |
+| `kmsg` | on `start` only: whether the kernel log is readable |
 | `drv` | whether the driver's `controller_manager` node is visible |
 
 Kernel under-voltage events are read from `/dev/kmsg` from the start of the ring buffer, so
@@ -87,7 +89,9 @@ pin sequence, reads back the image length with `stm32flash -r`, compares it with
 `/root/firmware.bin`, leaves the bootloader, and starts the driver again if it was running.
 It never passes `-w`, `-k` or `-u`. Result: `MATCH`, `MISMATCH` (count and first offset) or
 `READ FAILED`, printed and appended to `~/powerlog/log/fwcheck.jsonl`. The driver is down
-for about one minute.
+for about one minute. Exit codes are 0, 2 and 3; 1 means the check could not run, so a crash
+never reads as a verdict. The bootloader is left on any failure, including a stop signal, and
+the check runs only with the pinned image, whose flasher script was read.
 
 ### 4. Report
 
@@ -105,6 +109,12 @@ under-voltage event with its uptime, periods with no `/battery`, and gaps in the
 - A `stop` record cannot tell a clean shutdown from someone stopping the logger by hand.
 - Parsing and decision code is pure and unit-tested with `pytest` on the development
   machine; the rclpy node and `fwcheck` are checked on the robot.
+
+## Added after the first recorded cut (2026-11-14, 15:27 CET)
+
+The first cut the logger caught showed three identical `batt` values before the end. Another
+session's 4 Hz stream showed `/battery` had stalled 4 s earlier: the logger was repeating a
+stale reading. Hence `age`, and report periods dated from the last reading.
 
 ## Limits
 

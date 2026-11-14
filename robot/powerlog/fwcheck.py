@@ -6,11 +6,12 @@ driver stopped. It only reads: stm32flash gets -r and nothing that erases,
 writes or changes protection. The bootloader is entered with the Husarion
 flasher's own pin sequence and always left again, so the firmware restarts.
 
-Exit code: 0 MATCH, 1 MISMATCH, 2 READ FAILED.
+Exit code: 0 MATCH, 2 MISMATCH, 3 READ FAILED, 1 no verdict (could not run).
 """
 import importlib.util
 import json
 import os
+import signal
 import subprocess
 import sys
 from importlib.machinery import SourceFileLoader
@@ -26,7 +27,25 @@ RESULTS = Path("/log/fwcheck.jsonl")
 FLASH_BASE = 0x08000000
 BAUD = 115200
 READ_TIMEOUT_S = 180
-EXIT_CODES = {"MATCH": 0, "MISMATCH": 1, "READ FAILED": 2}
+# 1 is what Python and the shell return for any crash, so it must never be
+# a verdict: a broken check would read as "firmware differs".
+EXIT_ERROR = 1
+EXIT_CODES = {"MATCH": 0, "MISMATCH": 2, "READ FAILED": 3}
+
+
+class Interrupted(Exception):
+    """A stop signal arrived. Raised so the bootloader is left before exit."""
+
+
+def raise_on_signals() -> None:
+    """Without this, `docker stop` or a closed terminal would end the process
+    with the STM32 still held in its bootloader, and the robot would look dead."""
+
+    def interrupt(signum, _frame) -> None:
+        raise Interrupted(signal.Signals(signum).name)
+
+    signal.signal(signal.SIGTERM, interrupt)
+    signal.signal(signal.SIGHUP, interrupt)
 
 
 def compare_images(read: bytes, ref: bytes) -> dict:
@@ -53,11 +72,20 @@ def read_command(port: str, length: int, out: Path) -> List[str]:
     ]
 
 
+def _leave_bootloader(flasher) -> None:
+    try:
+        flasher.exit_bootloader_mode()
+    except Interrupted:
+        # A second signal landed inside the pin sequence; finish it anyway.
+        flasher.exit_bootloader_mode()
+
+
 def check(flasher, ref: bytes, out: Path, run: Callable = subprocess.run) -> dict:
     """Read `len(ref)` bytes back through the bootloader and compare.
-    `flasher` gives the port and the bootloader pin sequence."""
-    flasher.enter_bootloader_mode()
+    `flasher` gives the port and the bootloader pin sequence. The bootloader
+    is left whatever happens, including a failure half way into entering it."""
     try:
+        flasher.enter_bootloader_mode()
         done = run(
             read_command(flasher.port, len(ref), out),
             capture_output=True, text=True, timeout=READ_TIMEOUT_S,
@@ -65,7 +93,7 @@ def check(flasher, ref: bytes, out: Path, run: Callable = subprocess.run) -> dic
     except subprocess.TimeoutExpired:
         return {"result": "READ FAILED", "detail": f"no answer in {READ_TIMEOUT_S} s"}
     finally:
-        flasher.exit_bootloader_mode()
+        _leave_bootloader(flasher)
     if done.returncode != 0:
         lines = (done.stdout + done.stderr).strip().splitlines()
         return {"result": "READ FAILED", "detail": lines[-1] if lines else ""}
@@ -92,12 +120,22 @@ def load_flasher(reference: Path):
     return module.FirmwareFlasher(str(reference))
 
 
-def main() -> int:
-    result = check(load_flasher(REFERENCE), REFERENCE.read_bytes(), READ_BACK)
+def main(run: Callable = subprocess.run) -> int:
+    raise_on_signals()
+    try:
+        flasher = load_flasher(REFERENCE)
+        result = check(flasher, REFERENCE.read_bytes(), READ_BACK, run)
+    except (OSError, ImportError, AttributeError, TypeError, Interrupted) as error:
+        print(f"fwcheck: cannot run, no verdict: {error!r}", file=sys.stderr)
+        return EXIT_ERROR
     record = {"wall": wall(), "boot": boot_id(), "up": round(uptime(), 1), **result}
-    append_result(RESULTS, record)
+    # Printed before it is saved: a full card must not cost the verdict.
     print(json.dumps(record))
     print(f"fwcheck: {result['result']}")
+    try:
+        append_result(RESULTS, record)
+    except OSError as error:
+        print(f"fwcheck: result not saved: {error!r}", file=sys.stderr)
     return EXIT_CODES[result["result"]]
 
 

@@ -9,13 +9,17 @@ A container named `powerlog`, started by Docker at every boot. Every 2 s it appe
 to `~/powerlog/log/powerlog.jsonl` and syncs it to the card:
 
 - `uv`: the Pi saw under-voltage in the last 2 s (kernel `rpi_volt`).
-- `batt`: the 12 V input as the STM32 reports it on `/battery`; `null` when the STM32 or the
-  driver is silent.
+- `batt`: the 12 V input as the STM32 reports it on `/battery`; `null` once the last reading
+  is older than 5 s.
+- `age`: how old that reading is, in seconds. It normally stays under 0.5; when it grows, the
+  STM32 or the driver stopped talking at `up - age`.
 - `drv`: the driver's `controller_manager` node is visible.
 - `boot` and `up`: boot ID and seconds since boot. Use these to order events.
   `wall` is the robot's clock, which is wrong after a boot until NTP answers.
 
-Kernel under-voltage messages are copied as `uv` records with the kernel's own time.
+Kernel under-voltage messages are copied as `uv` records with the kernel's own time. A `start`
+record with `"kmsg": false` means the kernel log could not be read, so the absence of events
+proves nothing for that run; the report says so.
 The log rotates at 20 MB and keeps ten files.
 
 ## Deploy
@@ -34,7 +38,8 @@ ssh husarion@192.168.77.2 'python3 ~/powerlog/report.py --boots 5'
 ```
 
 For each boot: duration, how it ended, battery min, max and last reading, under-voltage
-events, periods without `/battery`, and holes in the samples. How a boot ended:
+events, periods without `/battery` (dated from the last reading), and holes in the samples.
+How a boot ended:
 
 | End | Meaning |
 |---|---|
@@ -51,14 +56,16 @@ ssh husarion@192.168.77.2 '~/powerlog/fwcheck.sh'
 ```
 
 It stops the driver, reads the STM32 flash back through its bootloader, compares it with
-`firmware.bin` of the driver image, and starts the driver again. It never writes to the chip.
-The driver is down for about a minute, so do not run it while the robot is in use.
+`firmware.bin` of the image pinned in `compose.yaml`, and starts the driver again. It never
+writes to the chip. The driver is down for about a minute, so do not run it while the robot is
+in use. It refuses to run if the driver uses another image than the pinned one.
 
 | Result | Exit | Meaning |
 |---|---|---|
 | `MATCH` | 0 | The chip holds the pinned image. A fault is not corrupted firmware. |
-| `MISMATCH` | 1 | The chip differs; the line gives how many bytes and the first offset. |
-| `READ FAILED` | 2 | The bootloader did not answer or refused the read. Not a verdict. |
+| `MISMATCH` | 2 | The chip differs; the line gives how many bytes and the first offset. |
+| `READ FAILED` | 3 | The bootloader did not answer or refused the read. Not a verdict. |
+| (none) | 1 | The check could not run. Not a verdict. |
 
 Results are appended to `~/powerlog/log/fwcheck.jsonl`. If power is lost during a check the
 driver stays stopped after the next boot: start it with `docker start rosbot`.
