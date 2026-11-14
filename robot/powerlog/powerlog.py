@@ -10,7 +10,6 @@ import os
 import signal
 import sys
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
@@ -22,6 +21,7 @@ from sensor_msgs.msg import BatteryState
 
 import records
 import store
+from hostinfo import boot_id, uptime, wall
 
 PERIOD = 2.0
 LOG_DIR = Path("/log")
@@ -29,18 +29,6 @@ BATT_TOPIC = "/battery"
 DRIVER_NODE = "controller_manager"
 KMSG = "/dev/kmsg"
 KMSG_RECORD_MAX = 8192
-
-
-def boot_id() -> str:
-    return Path("/proc/sys/kernel/random/boot_id").read_text().strip()
-
-
-def uptime() -> float:
-    return time.clock_gettime(time.CLOCK_BOOTTIME)
-
-
-def wall() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def find_uv_alarm() -> Optional[Path]:
