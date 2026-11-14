@@ -6,7 +6,8 @@ samples and calls these.
 
 A value that is nan never raises: it fails the check it belongs to. The robot
 already publishes nan (the effort field of /joint_states), so a bad sample is
-an expected input, not a programming error.
+an expected input, not a programming error. The one exception is a range
+sensor, where nan is how the firmware reports "nothing in range".
 """
 
 import math
@@ -88,7 +89,13 @@ def check_joint_names(names: list) -> CheckResult:
 def check_range_reading(sensor: str, value: float, min_range: float,
                         max_range: float) -> CheckResult:
     name = f"range/{sensor}"
-    if math.isnan(value) or value < 0:
+    if math.isnan(value):
+        # Firmware 0.11.0 publishes nan for every reading outside
+        # [min_range, max_range], and a sensor that never initialised reads the
+        # same. Only the interactive stage, with a hand in front of the sensor,
+        # can tell the two apart.
+        return CheckResult(name, True, "nan: no target in range, or sensor inactive")
+    if value < 0:
         return CheckResult(name, False, f"invalid reading {value}")
     if math.isinf(value) or value > max_range:
         return CheckResult(name, True, "no target in range")

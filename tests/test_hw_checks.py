@@ -94,8 +94,12 @@ class TestCheckRangeReading:
         assert result.passed
         assert result.detail == "no target in range"
 
-    def test_fails_on_nan(self):
-        assert not check_range_reading("fl", NAN, 0.01, 0.90).passed
+    def test_nan_is_the_firmware_way_of_saying_nothing_is_in_range(self):
+        # Firmware 0.11.0 replaces any reading outside [min_range, max_range]
+        # with nan, so nan alone cannot fail a sensor facing open space.
+        result = check_range_reading("rl", NAN, 0.01, 0.90)
+        assert result.passed
+        assert result.detail == "nan: no target in range, or sensor inactive"
 
     def test_fails_on_a_negative_distance(self):
         assert not check_range_reading("fl", -1.0, 0.01, 0.90).passed
