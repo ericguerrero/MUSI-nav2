@@ -19,19 +19,25 @@ from dataclasses import asdict
 from functools import partial
 
 import rclpy
+from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import BatteryState, Imu, JointState, LaserScan, Range
 
 from checks import (
+    MAX_ANGULAR,
+    MAX_LINEAR,
     check_imu_stationary,
     check_joint_names,
     check_range_reading,
     check_rate,
     check_scan,
+    check_stop,
     check_throttled,
     check_voltage,
+    check_wheel_response,
+    expected_wheel_velocities,
 )
 
 STAGES = ("sensors", "motors", "interactive", "camera")
@@ -49,6 +55,21 @@ RATE_CHECKS = (
     ("/scan_filtered", LaserScan, 10.0, 0.50),
 )
 BATTERY_TOPIC = "/battery"
+JOINT_TOPIC = "/joint_states"
+
+# (segment, linear m/s, angular rad/s, seconds). Short and bounded on purpose:
+# if the SSH link drops, the stage still ends by itself.
+MOTOR_SEQUENCE = (
+    ("forward", 0.10, 0.0, 3.0),
+    ("backward", -0.10, 0.0, 3.0),
+    ("turn_left", 0.0, 0.5, 3.0),
+    ("turn_right", 0.0, -0.5, 3.0),
+)
+PAUSE_SECONDS = 1.0
+STOP_WAIT_SECONDS = 1.0
+COMMAND_PERIOD = 0.05
+# Wheel speed is averaged over the end of a segment, after the ramp-up.
+AVERAGING_SECONDS = 2.0
 
 
 def parse_args(argv: list) -> argparse.Namespace:
@@ -162,7 +183,84 @@ def run_sensors(sampler: Sampler, args) -> list:
     return results + _content_checks(sampler)
 
 
-STAGE_RUNNERS = {"sensors": run_sensors}
+def require_wheels_off_ground(args) -> None:
+    if not args.wheels_off_ground:
+        raise SystemExit(
+            "The motors stage turns the wheels. Lift the robot so that all four "
+            "wheels are off the ground, then pass --wheels-off-ground.")
+
+
+def mean_wheel_velocities(samples: list, since: float) -> dict:
+    """Mean velocity per joint over the (time, {joint: velocity}) samples
+    received at or after `since`."""
+    recent = [velocities for stamp, velocities in samples if stamp >= since]
+    joints = {joint for velocities in recent for joint in velocities}
+    return {joint: sum(v[joint] for v in recent if joint in v)
+            / sum(1 for v in recent if joint in v) for joint in joints}
+
+
+def _joint_samples(sampler: Sampler) -> list:
+    return [(stamp, dict(zip(msg.name, msg.velocity)))
+            for stamp, msg in sampler.history(JOINT_TOPIC)]
+
+
+def _drive(sampler: Sampler, publisher, linear: float, angular: float,
+           seconds: float) -> None:
+    command = Twist()
+    command.linear.x = max(-MAX_LINEAR, min(MAX_LINEAR, linear))
+    command.angular.z = max(-MAX_ANGULAR, min(MAX_ANGULAR, angular))
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
+        publisher.publish(command)
+        sampler.collect(COMMAND_PERIOD)
+
+
+def _halt(publisher) -> None:
+    for _ in range(5):
+        publisher.publish(Twist())
+        time.sleep(COMMAND_PERIOD)
+
+
+def _run_motor_sequence(sampler: Sampler, publisher) -> list:
+    results = []
+    last = len(MOTOR_SEQUENCE) - 1
+    for index, (segment, linear, angular, seconds) in enumerate(MOTOR_SEQUENCE):
+        print(f"{segment}: {linear:+.2f} m/s, {angular:+.2f} rad/s", flush=True)
+        _drive(sampler, publisher, linear, angular, seconds)
+        measured = mean_wheel_velocities(
+            _joint_samples(sampler), time.monotonic() - AVERAGING_SECONDS)
+        results.append(check_wheel_response(
+            segment, measured, expected_wheel_velocities(linear, angular)))
+        if index < last:
+            sampler.collect(PAUSE_SECONDS)
+    return results
+
+
+def run_motors(sampler: Sampler, args, ask=input) -> list:
+    require_wheels_off_ground(args)
+    if ask("All four wheels are off the ground? Type yes to turn them: ").strip() != "yes":
+        raise SystemExit("Not confirmed. Nothing was commanded.")
+    sampler.watch(JOINT_TOPIC, JointState, keep=True)
+    sampler.watch(BATTERY_TOPIC, BatteryState, keep=True)
+    publisher = sampler.create_publisher(Twist, "/cmd_vel", 10)
+    sampler.collect(1.0)  # let discovery connect the publisher to the controller
+    finished = False
+    try:
+        results = _run_motor_sequence(sampler, publisher)
+        finished = True
+    finally:
+        if not finished:
+            _halt(publisher)
+    # No zero command is sent on purpose: the wheels must stop because the
+    # controller's cmd_vel_timeout (0.5 s) notices that commands ended.
+    sampler.collect(STOP_WAIT_SECONDS)
+    samples = _joint_samples(sampler)
+    results.append(check_stop(samples[-1][1] if samples else {}))
+    results.append(check_voltage([m.voltage for _, m in sampler.history(BATTERY_TOPIC)]))
+    return results
+
+
+STAGE_RUNNERS = {"sensors": run_sensors, "motors": run_motors}
 
 
 def main(argv: list) -> int:
