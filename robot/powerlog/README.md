@@ -68,6 +68,12 @@ in use. It refuses to run if the driver uses another image than the pinned one.
 | `READ FAILED` | 3 | The bootloader did not answer or refused the read. Not a verdict. |
 | (none) | 1 | The check could not run. Not a verdict. |
 
+**Expect the Pi to reset at the end of a check.** On the first real run (2026-11-14) the
+verdict was `MATCH` after a 29 s read, and the Pi lost power within 1.5 s of the STM32 leaving
+its bootloader, before the script could restart the driver. The same followed the end of a
+firmware flash that morning; one other flash end did not reset. The cause is not known. The
+verdict is on disk before the reset.
+
 Results are appended to `~/powerlog/log/fwcheck.jsonl`, after one line per bootloader step
 with its uptime, so a reset during a check can be placed. If power is lost during a check the
 driver stays stopped after the next boot: start it with `~/stack.sh up`, which also sets the
