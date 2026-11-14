@@ -361,9 +361,13 @@ def _hand_rows(sampler: Sampler) -> list:
 
 def _button_rows(sampler: Sampler) -> list:
     rows = []
+    # The rear panel has three buttons. The single one, apart from the other
+    # two, resets the CORE2 board; pressing it on 2026-11-14 cut the Pi's power.
+    print("The two buttons to press are the PAIR. Do not press the single button "
+          "beside them: it resets the board and the robot loses power.", flush=True)
     for side in SIDES:
-        print(f"Press the {side} button on the rear panel ({PROMPT_TIMEOUT:g} s)...",
-              flush=True)
+        print(f"Press the {side} button of the pair on the rear panel "
+              f"({PROMPT_TIMEOUT:g} s)...", flush=True)
         fresh = _new_messages(sampler, f"/button/{side}", lambda m: m.data,
                               PROMPT_TIMEOUT)
         rows.append(button_result(side, [m.data for m in fresh]))
