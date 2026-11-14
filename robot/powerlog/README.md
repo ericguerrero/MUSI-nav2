@@ -15,7 +15,8 @@ to `~/powerlog/log/powerlog.jsonl` and syncs it to the card:
   STM32 or the driver stopped talking at `up - age`.
 - `drv`: the driver's `controller_manager` node is visible.
 - `boot` and `up`: boot ID and seconds since boot. Use these to order events.
-  `wall` is the robot's clock, which is wrong after a boot until NTP answers.
+  `wall` is the robot's clock. The Pi has no RTC, so after a boot it is wrong until the
+  clock is set, and it can step by hours when that happens.
 
 Kernel under-voltage messages are copied as `uv` records with the kernel's own time. A `start`
 record with `"kmsg": false` means the kernel log could not be read, so the absence of events
