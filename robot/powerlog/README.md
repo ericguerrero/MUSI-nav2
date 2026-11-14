@@ -68,6 +68,9 @@ in use. It refuses to run if the driver uses another image than the pinned one.
 | `READ FAILED` | 3 | The bootloader did not answer or refused the read. Not a verdict. |
 | (none) | 1 | The check could not run. Not a verdict. |
 
+Run it on demand, after a fault. It is not run at boot on purpose: with the reset described
+below, a check at every boot could loop between boot, check and reset.
+
 **Expect the Pi to reset at the end of a check.** On the first real run (2026-11-14) the
 verdict was `MATCH` after a 29 s read, and the Pi lost power within 1.5 s of the STM32 leaving
 its bootloader, before the script could restart the driver. The same followed the end of a
