@@ -43,4 +43,8 @@ services:
     container_name: astra
     devices:
       - /dev/bus/usb/
+      # The Pi's H.264 encoder. The launch file's default codec, "rpi", makes
+      # the compressed image transport open it; without the device the camera
+      # node dies with a segmentation fault as soon as the colour stream starts.
+      - /dev/video11
     command: ros2 launch /husarion_utils/astra.launch.py device_namespace:=camera
