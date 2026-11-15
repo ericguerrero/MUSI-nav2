@@ -24,9 +24,18 @@ MAX_TURN = math.radians(720.0)
 
 DISTANCE_TOLERANCE = 0.01
 ANGLE_TOLERANCE = math.radians(1.0)
-# Inside the tolerance for this many updates in a row before a primitive is
-# done, so that a robot still coasting through the target does not count.
+# A primitive is done once the robot has been inside the tolerance AND at rest
+# for this many updates in a row. Without the "at rest" part a robot still
+# coasting through the target counted as arrived, and then stopped beyond it:
+# in Gazebo a 90 degree turn ended at 91.5.
 SETTLED_TICKS = 5
+STILL_LINEAR = 0.01    # m/s
+STILL_ANGULAR = 0.02   # rad/s
+
+# Speed per unit of remaining distance or angle on the final approach. The
+# trapezoid's braking curve assumes the robot obeys at once; a real base lags,
+# and this slower, proportional ending is what keeps it from overshooting.
+APPROACH_GAIN = 2.0
 
 # A real base does not move below some command (friction, motor deadband).
 # Outside the tolerance the command never drops under these.
@@ -132,6 +141,7 @@ class PrimitiveRunner:
         self._start = None
         self._previous_yaw = None
         self._turned = 0.0
+        self._covered = 0.0
         self._remaining = primitive.amount
         self._command = 0.0
         self._settled = 0
@@ -154,15 +164,21 @@ class PrimitiveRunner:
             return self._turn(pose, dt)
         return self._forward(pose, dt)
 
-    def _settle(self, tolerance: float) -> bool:
-        """Count updates inside the tolerance; True once the primitive is done."""
-        inside = abs(self._remaining) < tolerance
-        self._settled = self._settled + 1 if inside else 0
+    def _settle(self, covered: float, tolerance: float, still: float, dt: float) -> bool:
+        """Note how far the robot has got; True once the primitive is done."""
+        rate = abs(covered - self._covered) / dt if dt > 0 else math.inf
+        self._covered = covered
+        self._remaining = self._primitive.amount - covered
+        arrived = abs(self._remaining) < tolerance and rate < still
+        self._settled = self._settled + 1 if arrived else 0
         return self.done
 
     def _profile(self, max_speed: float, accel: float, floor: float,
                  tolerance: float, dt: float) -> float:
         speed = speed_toward(self._remaining, self._command, max_speed, accel, dt)
+        approach = APPROACH_GAIN * abs(self._remaining)
+        if abs(speed) > approach:
+            speed = math.copysign(approach, self._remaining)
         if abs(self._remaining) >= tolerance and abs(speed) < floor:
             speed = math.copysign(floor, self._remaining)
         self._command = speed
@@ -173,8 +189,7 @@ class PrimitiveRunner:
         # Progress along the heading the robot started with: drifting sideways
         # does not count as distance covered.
         progress = (pose[0] - x0) * math.cos(yaw0) + (pose[1] - y0) * math.sin(yaw0)
-        self._remaining = self._primitive.amount - progress
-        if self._settle(DISTANCE_TOLERANCE):
+        if self._settle(progress, DISTANCE_TOLERANCE, STILL_LINEAR, dt):
             return 0.0, 0.0
         limits = self._limits
         linear = self._profile(limits.max_linear, limits.linear_accel, MIN_LINEAR,
@@ -188,8 +203,7 @@ class PrimitiveRunner:
         # 270 degree turn is not mistaken for 90 degrees the other way.
         self._turned += normalize_angle(pose[2] - self._previous_yaw)
         self._previous_yaw = pose[2]
-        self._remaining = self._primitive.amount - self._turned
-        if self._settle(ANGLE_TOLERANCE):
+        if self._settle(self._turned, ANGLE_TOLERANCE, STILL_ANGULAR, dt):
             return 0.0, 0.0
         limits = self._limits
         angular = self._profile(limits.max_angular, limits.angular_accel, MIN_ANGULAR,
