@@ -78,6 +78,7 @@ Hands-on learning materials in [docs/exercises/](docs/exercises/):
 - **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
 - **[Resource Optimization](docs/resource_optimization.md)** - Run on low-spec systems (4 GB RAM)
 - **[ROS2 Essentials](docs/ros2_essentials.md)** - Command reference and workflows
+- **[Motion Primitives](docs/motion_primitives.md)** - Tell the robot "forward 2 m" or "turn 90°"
 - **[Exercises](docs/exercises/)** - Hands-on navigation exercises
 
 ---
