@@ -30,16 +30,28 @@ check() {  # label, then a command whose exit code decides
     if "$@"; then pass "${label}"; else fail "${label}"; fi
 }
 
-# "x y yaw" as the node sees it.
-odom_pose() {
-    timeout 8 ros2 topic echo --once /odometry/filtered --field pose.pose 2>/dev/null \
-        | python3 -c '
-import math, sys, yaml
-pose = yaml.safe_load(sys.stdin.read().split("---")[0])
-p, q = pose["position"], pose["orientation"]
-yaw = math.atan2(2 * (q["w"] * q["z"] + q["x"] * q["y"]), 1 - 2 * (q["y"] ** 2 + q["z"] ** 2))
-print(p["x"], p["y"], yaw)'
+# "x y yaw speed" from one odometry message. A subscription, not
+# `ros2 topic echo`: that prints "A message was lost!!!" ahead of the data now
+# and then, and the reading came back empty.
+odom_probe() {
+    timeout 10 python3 -c '
+import math, rclpy
+from nav_msgs.msg import Odometry
+from rclpy.qos import qos_profile_sensor_data
+rclpy.init()
+node = rclpy.create_node("odom_probe")
+seen = []
+node.create_subscription(Odometry, "/odometry/filtered", seen.append, qos_profile_sensor_data)
+while not seen:
+    rclpy.spin_once(node, timeout_sec=0.2)
+p, q = seen[-1].pose.pose.position, seen[-1].pose.pose.orientation
+yaw = math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z))
+print(p.x, p.y, yaw, seen[-1].twist.twist.linear.x)' 2>/dev/null
 }
+
+# "x y yaw" as the node sees it.
+odom_pose() { odom_probe | cut -d" " -f1-3; }
+odom_speed() { odom_probe | cut -d" " -f4; }
 
 # "x y yaw" as Gazebo knows it.
 true_pose() {
@@ -124,7 +136,7 @@ true_m="$(moved "${true_before}" "${true_after}")"
 check "backward: odometry moved ${odom_m} m (-0.50 +- 0.03)" within "${odom_m}" -0.50 0.03
 echo "INFO  backward: the robot really moved ${true_m} m"
 
-speed="$(timeout 8 ros2 topic echo --once /odometry/filtered --field twist.twist.linear.x 2>/dev/null | head -1)"
+speed="$(odom_speed)"
 check "the robot is at rest afterwards (speed ${speed} m/s)" within "${speed}" 0 0.01
 
 echo "Result: ${failures} failure(s)"
