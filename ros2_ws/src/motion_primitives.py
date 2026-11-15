@@ -15,18 +15,22 @@ Works the same against the ROSbot 2R simulation and the real robot: both give
 never the message stamps, so a robot whose clock is hours off is no problem.
 
 Exit codes: 0 done, 2 bad input, 3 no odometry at start, 4 took too long
-(robot blocked?), 5 odometry stopped arriving, 130 interrupted.
+(robot blocked?), 5 odometry stopped arriving, 6 odometry jumped,
+130 interrupted.
 """
 
 import math
+import signal
 import sys
 import time
 
 import rclpy
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
+from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
+from rclpy.signals import SignalHandlerOptions
 from rclpy.utilities import remove_ros_args
 
 from motion_primitives_core import (
@@ -36,6 +40,8 @@ from motion_primitives_core import (
     PrimitiveRunner,
     expected_duration,
     parse_primitives,
+    pose_is_finite,
+    pose_jumped,
 )
 
 EXIT_OK = 0
@@ -43,6 +49,7 @@ EXIT_USAGE = 2
 EXIT_NO_FEEDBACK = 3
 EXIT_TIMEOUT = 4
 EXIT_STALE = 5
+EXIT_JUMP = 6
 EXIT_INTERRUPTED = 130
 
 CONTROL_RATE_HZ = 20.0
@@ -80,6 +87,10 @@ def describe(primitive: Primitive, covered: float) -> str:
     return f"forward {primitive.amount:+.3f} m: odometry reports {covered:+.3f} m"
 
 
+def complain(message: str) -> None:
+    print(f"motion_primitives: {message}", file=sys.stderr)
+
+
 class MotionPrimitives(Node):
     """Odometry in, velocity commands out, one primitive at a time."""
 
@@ -87,10 +98,8 @@ class MotionPrimitives(Node):
         super().__init__("motion_primitives")
         self.declare_parameter("feedback_topic", "/odometry/filtered")
         self.declare_parameter("cmd_vel_topic", "/cmd_vel")
-        self.declare_parameter("max_linear", Limits.max_linear)
-        self.declare_parameter("max_angular", Limits.max_angular)
-        self.limits = Limits(max_linear=self.get_parameter("max_linear").value,
-                             max_angular=self.get_parameter("max_angular").value)
+        self.limits = Limits(max_linear=self._speed("max_linear", Limits.max_linear),
+                             max_angular=self._speed("max_angular", Limits.max_angular))
         self.feedback_topic = self.get_parameter("feedback_topic").value
         self._commands = self.create_publisher(
             Twist, self.get_parameter("cmd_vel_topic").value, 10)
@@ -99,11 +108,28 @@ class MotionPrimitives(Node):
                                  qos_profile_sensor_data)
         self._pose = None
         self._last_feedback = None
+        self._poses_seen = 0
+
+    def _speed(self, name: str, default: float) -> float:
+        # Any type accepted, then converted: "max_angular:=1" arrives as an
+        # integer, and a parameter declared as a float would refuse it.
+        self.declare_parameter(name, default, ParameterDescriptor(dynamic_typing=True))
+        value = self.get_parameter(name).value
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            raise PrimitiveError(f"{name} must be a number, got '{value}'") from None
 
     def _on_odometry(self, msg) -> None:
         p = msg.pose.pose
-        self._pose = (p.position.x, p.position.y, yaw_from_quaternion(p.orientation))
+        pose = (p.position.x, p.position.y, yaw_from_quaternion(p.orientation))
+        if not pose_is_finite(pose):
+            # Ignored as if it had not arrived, so that a stream of them ends
+            # the move through the "odometry stopped" exit.
+            return
+        self._pose = pose
         self._last_feedback = time.monotonic()
+        self._poses_seen += 1
 
     def _spin_until(self, deadline: float) -> None:
         while True:
@@ -118,27 +144,46 @@ class MotionPrimitives(Node):
             rclpy.spin_once(self, timeout_sec=0.1)
         return self._pose is not None
 
+    def _publish(self, linear: float, angular: float) -> None:
+        command = Twist()
+        command.linear.x = float(linear)
+        command.angular.z = float(angular)
+        self._commands.publish(command)
+
+    def _give_up(self, primitive: Primitive, started: float, now: float):
+        """The exit code for a move that must end now, or None to carry on."""
+        if feedback_is_stale(now, self._last_feedback):
+            complain(f"no odometry for {STALE_AFTER_S} s, stopping")
+            return EXIT_STALE
+        if now - started > timeout_for(primitive, self.limits):
+            complain("took too long, is the robot blocked? Stopping")
+            return EXIT_TIMEOUT
+        return None
+
     def run(self, primitive: Primitive) -> int:
         runner = PrimitiveRunner(primitive, self.limits)
         period = 1.0 / CONTROL_RATE_HZ
-        started = previous = time.monotonic()
+        started = tick = time.monotonic()
+        used_pose, used_at, used_count = None, None, None
+        command = (0.0, 0.0)
         while not runner.done:
-            self._spin_until(previous + period)
-            now = time.monotonic()
-            if feedback_is_stale(now, self._last_feedback):
-                print(f"motion_primitives: no odometry for {STALE_AFTER_S} s, stopping",
-                      file=sys.stderr)
-                return EXIT_STALE
-            if now - started > timeout_for(primitive, self.limits):
-                print("motion_primitives: took too long, is the robot blocked? Stopping",
-                      file=sys.stderr)
-                return EXIT_TIMEOUT
-            linear, angular = runner.update(self._pose, now - previous)
-            previous = now
-            command = Twist()
-            command.linear.x = float(linear)
-            command.angular.z = float(angular)
-            self._commands.publish(command)
+            self._spin_until(tick + period)
+            tick = time.monotonic()
+            code = self._give_up(primitive, started, tick)
+            if code is not None:
+                return code
+            # The control law runs only on a pose it has not seen. Feeding it
+            # the same pose again reads as "the robot is standing still", and
+            # with odometry arriving in gaps that ended moves mid-motion.
+            if self._poses_seen != used_count:
+                dt = period if used_at is None else self._last_feedback - used_at
+                if used_pose is not None and pose_jumped(used_pose, self._pose, dt):
+                    complain("odometry jumped (was the pose estimate reset?), stopping")
+                    return EXIT_JUMP
+                command = runner.update(self._pose, dt)
+                used_pose, used_at, used_count = (self._pose, self._last_feedback,
+                                                  self._poses_seen)
+            self._publish(*command)
         covered = primitive.amount - runner.remaining
         print(f"{describe(primitive, covered)}, {time.monotonic() - started:.1f} s",
               flush=True)
@@ -148,23 +193,22 @@ class MotionPrimitives(Node):
         """Zero commands on the way out. The robot also stops by itself half a
         second after the last command, so this only makes the stop prompt."""
         for _ in range(5):
-            self._commands.publish(Twist())
+            self._publish(0.0, 0.0)
             time.sleep(1.0 / CONTROL_RATE_HZ)
 
 
 def _usage_error(error: Exception) -> int:
-    print(f"motion_primitives: {error}", file=sys.stderr)
+    complain(str(error))
     print(USAGE, file=sys.stderr)
     return EXIT_USAGE
 
 
 def _run_all(node: MotionPrimitives, primitives: list) -> int:
-    if not node.wait_for_feedback():
-        print(f"motion_primitives: no odometry on {node.feedback_topic} in "
-              f"{FEEDBACK_WAIT_S:g} s; is the robot or the simulation running?",
-              file=sys.stderr)
-        return EXIT_NO_FEEDBACK
     try:
+        if not node.wait_for_feedback():
+            complain(f"no odometry on {node.feedback_topic} in {FEEDBACK_WAIT_S:g} s; "
+                     "is the robot or the simulation running?")
+            return EXIT_NO_FEEDBACK
         for primitive in primitives:
             code = node.run(primitive)
             if code != EXIT_OK:
@@ -182,7 +226,15 @@ def main(argv: list) -> int:
         primitives = parse_primitives(split_arguments(argv))
     except PrimitiveError as error:
         return _usage_error(error)
-    rclpy.init(args=argv)
+    # rclpy's own signal handlers shut the context down before Python sees the
+    # interrupt, and the zero commands then cannot be published: Ctrl-C left
+    # the robot to its own timeout. So the signals stay with Python, and
+    # SIGTERM is treated like Ctrl-C. SIGINT is set explicitly as well: a
+    # process started in the background by a script inherits it as "ignored",
+    # and a program that moves a robot must always be stoppable.
+    rclpy.init(args=argv, signal_handler_options=SignalHandlerOptions.NO)
+    signal.signal(signal.SIGINT, signal.default_int_handler)
+    signal.signal(signal.SIGTERM, signal.default_int_handler)
     try:
         try:
             node = MotionPrimitives()

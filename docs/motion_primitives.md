@@ -58,11 +58,19 @@ steers back toward the starting heading.
 | 2 | bad input: unknown word, missing or zero amount, more than 10 m or 720° in one move. Nothing was sent to the robot |
 | 3 | no odometry within 5 s of starting: is the robot or the simulation running? |
 | 4 | a move took more than three times its expected duration plus 5 s: the robot is probably blocked |
-| 5 | odometry stopped arriving for 0.5 s during a move |
-| 130 | interrupted with Ctrl-C |
+| 5 | odometry stopped arriving for 0.5 s during a move, or turned to `nan` |
+| 6 | odometry jumped further than the robot can move: the pose estimate was probably reset |
+| 130 | interrupted with Ctrl-C or stopped with `kill` |
 
 On every way out the node sends zero commands. The robot does not depend on
 them: its own drive controller stops 0.5 s after the last command it receives.
+
+Odometry that arrives late or in bursts, as over Wi-Fi, does not shorten a
+move: the node only acts on a pose it has not used before and repeats its last
+command in between.
+
+`tests/run_motion_primitives_fault_test.sh` checks each of these exits against
+a stand-in robot that misbehaves on purpose.
 
 All timing uses the clock of the computer the node runs on, never the stamps in
 the messages. A robot whose clock is hours off, as the lab robot's is after a

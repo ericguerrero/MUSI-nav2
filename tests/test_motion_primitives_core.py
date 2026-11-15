@@ -19,6 +19,8 @@ from motion_primitives_core import (
     expected_duration,
     normalize_angle,
     parse_primitives,
+    pose_is_finite,
+    pose_jumped,
     speed_toward,
 )
 
@@ -186,3 +188,32 @@ class TestTurn:
     def test_the_robot_stays_in_place(self):
         run = simulate(Primitive("turn", math.pi), Limits())
         assert run.max_progress < 1e-9
+
+
+class TestPoseIsFinite:
+    def test_an_ordinary_pose_is_finite(self):
+        assert pose_is_finite((1.0, -2.0, 3.0))
+
+    @pytest.mark.parametrize("pose", [
+        (math.nan, 0.0, 0.0), (0.0, math.nan, 0.0), (0.0, 0.0, math.nan), (math.inf, 0.0, 0.0)])
+    def test_nan_or_infinity_anywhere_is_not(self, pose):
+        # A nan pose once made the node command full speed: min(limit, nan) is the limit.
+        assert not pose_is_finite(pose)
+
+
+class TestPoseJumped:
+    def test_motion_the_robot_can_make_is_not_a_jump(self):
+        assert not pose_jumped((0.0, 0.0, 0.0), (0.04, 0.0, 0.1), dt=0.05)
+
+    def test_half_a_metre_in_one_tick_is_a_jump(self):
+        # What a reset of the pose estimate looks like from here.
+        assert pose_jumped((0.5, 0.0, 0.0), (0.0, 0.0, 0.0), dt=0.05)
+
+    def test_half_a_turn_in_one_tick_is_a_jump(self):
+        assert pose_jumped((0.0, 0.0, 0.0), (0.0, 0.0, math.pi), dt=0.05)
+
+    def test_crossing_the_yaw_wrap_is_not_a_jump(self):
+        assert not pose_jumped((0.0, 0.0, 3.13), (0.0, 0.0, -3.13), dt=0.05)
+
+    def test_a_longer_gap_allows_more_motion(self):
+        assert not pose_jumped((0.0, 0.0, 0.0), (0.25, 0.0, 0.0), dt=0.3)

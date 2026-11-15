@@ -123,6 +123,30 @@ def speed_toward(remaining: float, previous: float, max_speed: float,
     return math.copysign(magnitude, remaining)
 
 
+def pose_is_finite(pose: tuple) -> bool:
+    """False for a pose with nan or infinity in it. Such a pose must never
+    reach the control law: min(limit, nan) is the limit, so a nan pose would
+    turn into a full-speed command."""
+    return all(math.isfinite(value) for value in pose)
+
+
+# Slack on top of what the robot can do in the elapsed time, for timing jitter.
+JUMP_MARGIN_M = 0.05
+JUMP_MARGIN_RAD = 0.2
+
+
+def pose_jumped(previous: tuple, pose: tuple, dt: float) -> bool:
+    """True when the pose moved further than the robot possibly could in dt.
+
+    That is what a reset of the pose estimate looks like. Carrying on would
+    measure the rest of the move from a pose that no longer means anything.
+    """
+    distance = math.hypot(pose[0] - previous[0], pose[1] - previous[1])
+    turn = abs(normalize_angle(pose[2] - previous[2]))
+    return (distance > MAX_LINEAR_LIMIT * dt + JUMP_MARGIN_M
+            or turn > MAX_ANGULAR_LIMIT * dt + JUMP_MARGIN_RAD)
+
+
 def expected_duration(primitive: Primitive, limits: Limits) -> float:
     """Roughly how long a primitive takes: cruise time plus one ramp."""
     if primitive.kind == "turn":
