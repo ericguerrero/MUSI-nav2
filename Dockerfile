@@ -64,11 +64,18 @@ RUN pip3 install --no-cache-dir transforms3d numpy pillow pyyaml scipy matplotli
 # usbutils) serve firmware flashing on the real robot. rosdep install cannot
 # be pointed at the install tree directly: colcon's COLCON_IGNORE there makes
 # it find no packages and report success.
+#
+# The copied setup hooks hard-code the original /ros2_ws/install prefix, and
+# Gazebo resolves the robot's meshes through the IGN_GAZEBO_RESOURCE_PATH they
+# set. Here /ros2_ws is the student workspace, so the prefix is rewritten in
+# every text file; without it the robot simulates but renders invisible.
 COPY --from=rosbot_gazebo /ros2_ws/install /opt/rosbot_ws/install
 COPY patches/rosbot_ros/0001-optional-camera.patch /tmp/0001-optional-camera.patch
 RUN patch /opt/rosbot_ws/install/rosbot_description/share/rosbot_description/urdf/rosbot.urdf.xacro \
         < /tmp/0001-optional-camera.patch \
     && rm /tmp/0001-optional-camera.patch \
+    && grep -rlI /ros2_ws/install /opt/rosbot_ws/install \
+        | xargs sed -i 's#/ros2_ws/install#/opt/rosbot_ws/install#g' \
     && apt-get update && apt-get install -y \
         ros-humble-ign-ros2-control \
         ros-humble-robot-localization \

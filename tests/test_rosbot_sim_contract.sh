@@ -62,6 +62,16 @@ done
 pass "simulation starts and activates rosbot_base_controller"
 sleep 10
 
+# Gazebo resolves the robot's meshes through IGN_GAZEBO_RESOURCE_PATH. A wrong
+# path still simulates physics and odometry, but the robot renders invisible
+# in the Gazebo window and to simulated cameras.
+missing="$(sed 's/\x1b\[[0-9;]*m//g' "${LOG}" | grep -o 'Unable to find file\[[^]]*' | sort -u | sed 's/.*\[//')"
+if [ -z "${missing}" ]; then
+    pass "Gazebo finds every robot mesh"
+else
+    fail "Gazebo finds every robot mesh; missing: $(echo ${missing})"
+fi
+
 topics="$(ros2 topic list -t)"
 for entry in "${CONTRACT_TOPICS[@]}"; do
     name="${entry% *}"
