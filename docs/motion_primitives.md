@@ -96,8 +96,12 @@ simulated wheels barely slip. On a real floor they will not agree this well.
 
 ## On the real robot
 
-Not run there yet. The defaults already match the robot's topics. Before the
-first run:
+Not run there yet. The defaults already match the robot's topics.
+
+Simulation comes first: whatever is to be tried on the robot is run in the
+simulation before, and `tests/run_motion_primitives_sim_test.sh` and
+`tests/run_motion_primitives_fault_test.sh` pass on the code that will drive
+it. Then, before the first run on the robot:
 
 - ROS 2 discovery between this computer and the robot checked on purpose: host
   networking, `ROS_DOMAIN_ID` 0, and no simulation running anywhere on that
