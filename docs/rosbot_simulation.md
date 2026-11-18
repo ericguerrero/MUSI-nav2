@@ -42,6 +42,34 @@ ros2 run teleop_twist_keyboard teleop_twist_keyboard
 
 The base frame is `base_link`; there is no `base_footprint`.
 
+## Skid-steer and mecanum
+
+By default the robot is skid-steer: four driven wheels, no casters, driven by
+`diff_drive_controller`. The controller treats it as a differential drive with
+an effective track width of 0.186 m × `wheel_separation_multiplier` 1.45, which
+accounts for the wheels scrubbing sideways in a turn. `mecanum:=true` swaps in
+mecanum wheels and `mecanum_drive_controller`, which adds sideways motion
+(`linear.y`).
+
+Husarion gives every wheel the friction Gazebo uses to imitate mecanum rollers.
+This image patches the ordinary wheels to grip equally in every direction
+(`patches/rosbot_ros/0002-skid-steer-friction.patch`), so the skid-steer robot
+behaves like one. Measured on 2026-11-18 against Gazebo's own pose:
+
+| Test | Skid friction | Roller friction (unpatched) |
+|---|---|---|
+| Turn 90° on the spot, 0.5–2.0 rad/s: multiplier that makes wheel odometry exact | 1.42–1.44 | 1.41–1.42 |
+| Half circle, commanded radius 0.40 m, at 0.9 m/s: true radius | +7.5 % | +40.7 % |
+
+Turning on the spot hardly differs. Fast corners do: roller wheels let the
+robot slide outward. The arc numbers are estimated from the chord of a timed
+half circle and are approximate.
+
+`/odometry/filtered` fuses the IMU gyro, so its heading stays close to the
+truth whatever the wheels do. The wheel-only odometry,
+`/rosbot_base_controller/odom`, is where slip shows. On the real robot the
+multiplier depends on the floor and should be measured there.
+
 ## Do not share a network with the robot by accident
 
 The lab robot uses `ROS_DOMAIN_ID` 0 with no namespace, and the container uses
