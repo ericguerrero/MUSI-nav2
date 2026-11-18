@@ -69,11 +69,17 @@ RUN pip3 install --no-cache-dir transforms3d numpy pillow pyyaml scipy matplotli
 # Gazebo resolves the robot's meshes through the IGN_GAZEBO_RESOURCE_PATH they
 # set. Here /ros2_ws is the student workspace, so the prefix is rewritten in
 # every text file; without it the robot simulates but renders invisible.
+#
+# Patches, each against the installed rosbot_description/urdf file it names:
+# 0001 makes the camera optional (ROSBOT_CAMERA), 0002 gives the ordinary
+# wheels real skid-steer friction instead of the mecanum roller friction
+# Husarion applies to every wheel.
 COPY --from=rosbot_gazebo /ros2_ws/install /opt/rosbot_ws/install
-COPY patches/rosbot_ros/0001-optional-camera.patch /tmp/0001-optional-camera.patch
-RUN patch /opt/rosbot_ws/install/rosbot_description/share/rosbot_description/urdf/rosbot.urdf.xacro \
-        < /tmp/0001-optional-camera.patch \
-    && rm /tmp/0001-optional-camera.patch \
+COPY patches/rosbot_ros /tmp/rosbot_ros_patches
+RUN URDF=/opt/rosbot_ws/install/rosbot_description/share/rosbot_description/urdf \
+    && patch "${URDF}/rosbot.urdf.xacro" < /tmp/rosbot_ros_patches/0001-optional-camera.patch \
+    && patch "${URDF}/wheel.urdf.xacro" < /tmp/rosbot_ros_patches/0002-skid-steer-friction.patch \
+    && rm -rf /tmp/rosbot_ros_patches \
     && grep -rlI /ros2_ws/install /opt/rosbot_ws/install \
         | xargs sed -i 's#/ros2_ws/install#/opt/rosbot_ws/install#g' \
     && apt-get update && apt-get install -y \

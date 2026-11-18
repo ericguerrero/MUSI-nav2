@@ -1,0 +1,25 @@
+--- a/rosbot_description/urdf/wheel.urdf.xacro
++++ b/rosbot_description/urdf/wheel.urdf.xacro
+@@ -94,11 +94,22 @@
+       <collision>
+         <surface>
+           <friction>
++            <!-- MUSI-nav2: only mecanum wheels get the 45 degree roller friction.
++                 Ordinary wheels grip equally in every direction, so the skid-steer
++                 robot scrubs sideways when it turns, as the real one does. -->
++            <xacro:if value="${mecanum}">
+             <ode>
+               <mu>1.0</mu>
+               <mu2>0.0</mu2>
+               <fdir1 ignition:expressed_in="base_link">${fdir}</fdir1>
+             </ode>
++            </xacro:if>
++            <xacro:unless value="${mecanum}">
++            <ode>
++              <mu>1.0</mu>
++              <mu2>1.0</mu2>
++            </ode>
++            </xacro:unless>
+           </friction>
+         </surface>
+       </collision>
