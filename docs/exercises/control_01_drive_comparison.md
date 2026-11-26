@@ -1,10 +1,11 @@
 # Lab 1: compare wheel drives by measurement
 
-You send the same four velocity commands to three robots in the simulator and
+You send the same four velocity commands to four robots in the simulator and
 write down what each robot really does. The lecture made claims about
-differential, skid-steer and mecanum drives; here you check them with numbers.
+differential, skid-steer, mecanum and Ackermann (car-like) drives; here you
+check them with numbers.
 
-Time: 45 minutes. Hand in: this sheet with the three tables and the four
+Time: 45 minutes. Hand in: this sheet with the four tables and the four
 answers, one per team.
 
 ## What you need
@@ -27,13 +28,14 @@ These two lines keep your simulation on your own computer. The lab robot
 listens on the same network. Without them, the commands meant for your
 simulated robot can reach the real one and move it.
 
-## The three robots
+## The four robots
 
 | Drive | Robot | Wheels |
 |---|---|---|
 | Differential | TurtleBot3 Waffle | two driven wheels, two ball casters |
 | Skid-steer | ROSbot 2R | four driven wheels, no steering, no casters |
 | Mecanum | ROSbot 2R with mecanum wheels | four driven wheels with 45° rollers |
+| Ackermann | small car-like robot | rear wheels drive, front wheels steer; wheelbase 0.26 m |
 
 ## The four manoeuvres
 
@@ -61,7 +63,7 @@ faced when the manoeuvre started.
 
 ## Run it
 
-Do the three robots one after the other. Only one simulation may run at a time.
+Do the four robots one after the other. Only one simulation may run at a time.
 
 ### 1. Differential: TurtleBot3 Waffle
 
@@ -113,14 +115,33 @@ python3 /ros2_ws/src/drive_test.py --ros-args -p robot:=rosbot_mecanum
 
 Copy the numbers into table 3. Ctrl-C in terminal 1.
 
+### 4. Ackermann: car-like robot
+
+Terminal 1:
+
+```bash
+ros2 launch /ros2_ws/src/ackermann_simulation.launch.py
+```
+
+Wait for the line `Configured and activated ackermann_steering_controller`.
+The terminal then prints `Use of Twist message without stamped is deprecated`
+for every command; ignore it. Terminal 2:
+
+```bash
+python3 /ros2_ws/src/drive_test.py --ros-args -p robot:=ackermann
+```
+
+Copy the numbers into table 4. Ctrl-C in terminal 1.
+
 ### If something goes wrong
 
 - `drive_test: no wheel odometry ... Is the simulation ... running?` The
   simulation is not ready, or `robot:=` does not match the simulation that is
   running, or the two `export` lines are missing in one of the terminals.
 - Ctrl-C in terminal 2 stops the robot and the script at any time.
-- The computer is slow: add `headless:=true` to the launch command. Gazebo then
-  runs without its window and the numbers are the same.
+- The computer is slow, or the Gazebo window does not open or closes by itself:
+  add `headless:=true` to the launch command. Gazebo then runs without its
+  window and the numbers are the same.
 - A simulation does not start after you stopped another one: run
   `pkill -9 -f "ign gazebo"; pkill -9 gzserver` and start it again.
 
@@ -155,14 +176,24 @@ Write the numbers exactly as printed.
 | arc | 0.364 / 0.566 / 114.6 | | |
 | sideways | 0.000 / 1.000 / 0.0 | | |
 
+**Table 4. Ackermann (car-like robot)**
+
+| Manoeuvre | Commanded fwd / left / turn | True fwd / left / turn | Wheel odometry fwd / left / turn |
+|---|---|---|---|
+| straight | 1.000 / 0.000 / 0.0 | | |
+| spin | 0.000 / 0.000 / 114.6 | | |
+| arc | 0.364 / 0.566 / 114.6 | | |
+| sideways | 0.000 / 1.000 / 0.0 | | |
+
 ## Questions
 
 Answer each with numbers from your tables.
 
 1. **Spin on the spot.** Which robots turned without leaving their place? For
    each robot, give the true turn and how far the robot moved from where it
-   started. One of the three leaves its place by a few centimetres. Which one,
-   and what do its wheels have to do in order to turn?
+   started. One robot does not turn at all: which one, and why can it not turn
+   while standing still? One of the others leaves its place by a few
+   centimetres: which one, and what do its wheels have to do in order to turn?
 
 2. **Sideways.** Which robots moved to the left when `linear.y` was commanded?
    What did the others do with the command? Name the part of the robot that
@@ -175,12 +206,21 @@ Answer each with numbers from your tables.
    which robot dimension the odometry needs for a turn and does not need for a
    straight line.
 
+   Then look at the arc alone. The command asks for a circle of radius
+   `linear.x / angular.z` = 0.2 / 0.5 = 0.40 m. The radius a robot really drove
+   is `sqrt(fwd² + left²) / (2 · sin(turn / 2))`, with the true numbers.
+   Compute it for the Ackermann robot and for one other robot. The Ackermann
+   robot's steering stops at a turn of radius 0.50 m. What did it do with a
+   command for a tighter turn, and does its wheel odometry know?
+
 4. **Which drive for which task.** Choose a drive for each task and justify the
    choice with one number from your tables:
    a) a warehouse robot that must slide into a narrow gap between two shelves;
    b) an outdoor robot on gravel and grass;
    c) an indoor robot that must know its position from wheel odometry alone for
-   as long as possible.
+   as long as possible;
+   d) a robot that carries a load at speed along roads and wide corridors, and
+   never needs to turn in a space smaller than one metre across.
 
 ## Optional
 

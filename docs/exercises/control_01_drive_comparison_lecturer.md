@@ -7,10 +7,12 @@ students before the hand-in.
 ## How the numbers were measured
 
 - 2026-11-26, image `nav2_student:humble` (built 2026-11-18), `headless:=true`,
-  worlds `empty_world` (TurtleBot3) and `empty_with_plugins` (ROSbot).
+  worlds `empty_world` (TurtleBot3) and `empty_with_plugins` (ROSbot); the
+  Ackermann launch has its own empty world.
 - Each simulation in its own container on Docker's default bridge network with
   `ROS_LOCALHOST_ONLY=1` and a non-zero `ROS_DOMAIN_ID`. Not with `./run.sh`:
-  the student path (host networking, Gazebo window open) was not run.
+  the student path (host networking, Gazebo window open) was not run. The
+  image has no virtual display, so the Gazebo window was not tested at all.
 - Three consecutive runs of `drive_test.py` per robot in one simulation
   session, without restarting the simulation between runs. The tables show the
   first run. The spread over the three runs is given below each table.
@@ -61,9 +63,34 @@ further runs in other sessions gave the same spin and arc; one of them gave
 1.010 m sideways, true and odometry alike. Wheel odometry turn minus true turn:
 -13.7° in the spin, -13.8° in the arc.
 
+**Ackermann (car-like robot)**
+
+| Manoeuvre | Commanded | True (Gazebo) | Wheel odometry |
+|---|---|---|---|
+| straight | 1.000 / 0.000 / 0.0 | 1.000 / 0.000 / 0.0 | 1.000 / 0.000 / 0.0 |
+| spin | 0.000 / 0.000 / 114.6 | 0.000 / 0.000 / 0.0 | 0.000 / 0.000 / 0.0 |
+| arc | 0.364 / 0.566 / 114.6 | 0.530 / 0.475 / 86.1 | 0.525 / 0.490 / 88.8 |
+| sideways | 0.000 / 1.000 / 0.0 | 0.000 / 0.000 / 0.0 | 0.000 / 0.000 / 0.0 |
+
+Spread over three runs: arc true forward 0.527 to 0.530 m, left 0.475 to
+0.477 m, turn 86.1° every time; straight drifts up to 0.002 m to the left;
+everything else identical. Wheel odometry turn minus true turn: +2.7° in the
+arc.
+
+Arc radius from the true numbers, `sqrt(fwd² + left²) / (2 · sin(turn / 2))`,
+first run of each robot:
+
+| Robot | True arc radius | Commanded |
+|---|---|---|
+| Differential | 0.40 m | 0.40 m |
+| Skid-steer | 0.40 m | 0.40 m |
+| Mecanum | 0.36 m | 0.40 m |
+| Ackermann | 0.52 m | 0.40 m (minimum 0.50 m) |
+
 ## What students should expect to differ from these tables
 
-- TurtleBot3 numbers move by a few millimetres and up to 3° between runs (a spin in a freshly started simulation read 122.0°).
+- TurtleBot3 numbers move by a few millimetres and up to 3° between runs (a
+  spin in a freshly started simulation read 122.0°).
 - ROSbot wheel odometry turns come in steps of about 2.9°: the controller runs
   at 20 Hz, and at 1 rad/s one period is 2.9°. A spin reads 114.6° or 117.5°.
 - A slow computer does not change the numbers: the script times the manoeuvres
@@ -91,17 +118,28 @@ further runs in other sessions gave the same spin and arc; one of them gave
   with a controller geometry (`wheel_separation_x` 0.106 m, `wheel_separation_y`
   0.192 m, multipliers 1.0) that does not match the simulated rollers, but that
   explanation was not tested. Straight and sideways motion are exact.
+- **The Ackermann robot turns only as tight as its steering allows.** The
+  joints stop at the angles of a 0.50 m turn. The arc asks for 0.40 m; the
+  robot keeps the speed, drives at full lock and ends on a radius of 0.52 m
+  with 86° of turn where 114.6° was asked. The radius is above 0.50 m; the
+  time the steering needs to reach full lock and tyre slip would both do
+  that, and they were not separated. Its wheel odometry is computed
+  from the measured wheel speed and steering angle, so it follows the real
+  motion (88.8°) and not the command. See
+  [ackermann_simulation.md](../ackermann_simulation.md).
 - `/odometry/filtered` adds the gyroscope. Measured once on the mecanum robot:
   spin 128.5° against a true 128.3°, arc 128.3° against 128.4°.
 
 ## Expected answers
 
-1. **Spin on the spot.** All three turn on the spot: about 120°, 117° and
-   128°. The differential and mecanum robots stay within 3 mm of their place.
-   The skid-steer robot ends about 4 cm away: its four wheels point straight
-   ahead, so to turn they must slide sideways over the floor, and the sliding
-   is not symmetric.
-2. **Sideways.** Only the mecanum robot moves: 1.000 m. The other two stay at
+1. **Spin on the spot.** Differential, skid-steer and mecanum turn on the
+   spot: about 120°, 117° and 128°. The differential and mecanum robots stay
+   within 3 mm of their place. The skid-steer robot ends about 4 cm away: its
+   four wheels point straight ahead, so to turn they must slide sideways over
+   the floor, and the sliding is not symmetric. The Ackermann robot turns
+   0.0°: its yaw rate is speed times tan(steering angle) / wheelbase, and with
+   zero speed no steering angle produces a turn.
+2. **Sideways.** Only the mecanum robot moves: 1.000 m. The other three stay at
    0.000 m; their controllers have no use for `linear.y` and drop it. The
    difference is the wheel: the rollers at 45° let a wheel push diagonally, and
    four of them combine into a sideways force. An ordinary wheel cannot roll
@@ -112,36 +150,28 @@ further runs in other sessions gave the same spin and arc; one of them gave
    left and right contact points. For a differential drive this is a fixed,
    known length. For skid-steer and mecanum wheels the effective length depends
    on how the wheels slip, so it is a calibration value, and here it is
-   calibrated for the skid-steer robot and not for the mecanum robot.
+   calibrated for the skid-steer robot and not for the mecanum robot. The
+   Ackermann robot's error is +2.7° in the arc.
+
+   Arc radius: Ackermann 0.52 m, the others 0.36 to 0.40 m (table above). The
+   Ackermann robot kept the speed and turned at full lock, so it turned less
+   (86° for 114.6°) on a wider circle. Its wheel odometry does know: it reads
+   88.8°, close to the truth and far from the command, because it uses the
+   measured steering angle.
 4. **Which drive.** a) Mecanum: the only one with sideways motion (1.000 m
    against 0.000 m). b) Skid-steer: four driven wheels and no casters or
    rollers to sink or clog; the price is the scrubbing seen in the spin (4 cm).
    The tables do not measure rough ground, so accept any answer argued from the
    wheel layout. c) Differential: smallest turn error (0.4° against up to 3.5°
-   and 14°).
-
-## Ackermann robot
-
-`drive_test.py` has a preset `robot:=ackermann` for the car-like robot on
-branch `feature/ackermann-robot`
-(`ros2 launch /ros2_ws/src/ackermann_simulation.launch.py`). One run against
-that branch's files, same isolation as above:
-
-| Manoeuvre | Commanded | True (Gazebo) | Wheel odometry |
-|---|---|---|---|
-| straight | 1.000 / 0.000 / 0.0 | 1.000 / 0.000 / 0.0 | 1.000 / 0.000 / 0.0 |
-| spin | 0.000 / 0.000 / 114.6 | 0.000 / 0.000 / 0.0 | 0.000 / 0.000 / 0.0 |
-| arc | 0.364 / 0.566 / 114.6 | 0.530 / 0.475 / 86.1 | 0.525 / 0.490 / 88.8 |
-| sideways | 0.000 / 1.000 / 0.0 | 0.000 / 0.000 / 0.0 | 0.000 / 0.000 / 0.0 |
-
-It cannot spin on the spot or move sideways, and the commanded arc (radius
-0.40 m) is tighter than its minimum radius (0.50 m), so it turns 86° where
-114.6° was asked. The student worksheet does not include this robot yet.
+   and 14°). d) Ackermann: the straight line is exact (1.000 m) and no wheel
+   has to slide to turn; what it gives up, turning on the spot (0.0°) and
+   turns under 0.50 m radius, the task does not need. The tables do not
+   measure speed or load, so accept an answer argued from the wheel layout.
 
 ## Tests
 
 ```bash
 tests/run_unit_tests.sh -k drive_test
-tests/run_drive_test_sim_test.sh            # all three robots, about 6 minutes
+tests/run_drive_test_sim_test.sh            # all four robots, about 8 minutes
 tests/run_drive_test_sim_test.sh rosbot     # one robot
 ```
