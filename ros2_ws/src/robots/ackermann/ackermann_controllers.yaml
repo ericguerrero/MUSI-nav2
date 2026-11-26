@@ -1,0 +1,43 @@
+# Controllers for the Ackermann robot, loaded by ign_ros2_control inside Gazebo.
+#
+# wheelbase, track and wheel radius repeat the values of ackermann.urdf.xacro;
+# tests/test_ackermann_description.py fails when the two files disagree.
+controller_manager:
+  ros__parameters:
+    update_rate: 50
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    ackermann_steering_controller:
+      type: ackermann_steering_controller/AckermannSteeringController
+
+ackermann_steering_controller:
+  ros__parameters:
+    # Plain Twist on ~/reference_unstamped, remapped to /cmd_vel in the xacro.
+    # The Humble default is TwistStamped on ~/reference.
+    use_stamped_vel: false
+    # Stop when commands stop arriving.
+    reference_timeout: 0.5
+
+    front_steering: true
+    # Odometry from the measured wheel speed and steering angle, not from the
+    # command, so it shows what the wheels did.
+    open_loop: false
+    position_feedback: false
+    velocity_rolling_window_size: 10
+
+    # The controller expects the right wheel first.
+    rear_wheels_names: [rear_right_wheel_joint, rear_left_wheel_joint]
+    front_wheels_names: [front_right_steering_joint, front_left_steering_joint]
+
+    wheelbase: 0.26
+    front_wheel_track: 0.20
+    rear_wheel_track: 0.20
+    front_wheels_radius: 0.04
+    rear_wheels_radius: 0.04
+
+    base_frame_id: base_link
+    odom_frame_id: odom
+    # Nothing here consumes odom -> base_link on /tf.
+    enable_odom_tf: false
