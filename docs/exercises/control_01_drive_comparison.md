@@ -70,8 +70,10 @@ Do the four robots one after the other. Only one simulation may run at a time.
 Terminal 1:
 
 ```bash
-ros2 launch /ros2_ws/src/simulation.launch.py world:=empty_world rviz:=false
+ros2 launch /ros2_ws/src/simulation.launch.py world:=turtlebot3_house x:=-2.0 y:=-2.5 rviz:=false
 ```
+
+The robot starts in a room of the house, with walls two to three metres away.
 
 Wait until the robot stands in the Gazebo window. Terminal 2:
 
@@ -87,8 +89,10 @@ Ctrl-C in terminal 1 and wait for the prompt.
 Terminal 1:
 
 ```bash
-ros2 launch /ros2_ws/src/rosbot_simulation.launch.py world:=empty_with_plugins
+ros2 launch /ros2_ws/src/rosbot_simulation.launch.py
 ```
+
+The robot starts in front of the large Husarion logo, which the laser sees.
 
 This simulator needs about one minute to start. Wait for the line
 `Configured and activated rosbot_base_controller`. Terminal 2:
@@ -104,7 +108,7 @@ Copy the numbers into table 2. Ctrl-C in terminal 1.
 Terminal 1:
 
 ```bash
-ros2 launch /ros2_ws/src/rosbot_simulation.launch.py world:=empty_with_plugins mecanum:=true
+ros2 launch /ros2_ws/src/rosbot_simulation.launch.py mecanum:=true
 ```
 
 Wait for the same line. Terminal 2:
@@ -120,8 +124,10 @@ Copy the numbers into table 3. Ctrl-C in terminal 1.
 Terminal 1:
 
 ```bash
-ros2 launch /ros2_ws/src/ackermann_simulation.launch.py
+ros2 launch /ros2_ws/src/ackermann_simulation.launch.py world:=husarion_world y:=-2.0
 ```
+
+This is the same world and the same starting place as the ROSbot.
 
 Wait for the line `Configured and activated ackermann_steering_controller`.
 The terminal then prints `Use of Twist message without stamped is deprecated`
@@ -139,6 +145,9 @@ Copy the numbers into table 4. Ctrl-C in terminal 1.
   simulation is not ready, or `robot:=` does not match the simulation that is
   running, or the two `export` lines are missing in one of the terminals.
 - Ctrl-C in terminal 2 stops the robot and the script at any time.
+- To repeat a run, stop the simulation and start it again first. The robot does
+  not return to its starting place, and a second run from where the first one
+  ended can drive into a wall. The Ackermann robot does so.
 - The computer is slow, or the Gazebo window does not open or closes by itself:
   add `headless:=true` to the launch command. Gazebo then runs without its
   window and the numbers are the same.

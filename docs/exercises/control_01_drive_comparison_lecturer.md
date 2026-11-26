@@ -7,8 +7,21 @@ students before the hand-in.
 ## How the numbers were measured
 
 - 2026-11-26, image `nav2_student:humble` (built 2026-11-18), `headless:=true`,
-  worlds `empty_world` (TurtleBot3) and `empty_with_plugins` (ROSbot); the
-  Ackermann launch has its own empty world.
+  in the worlds and at the spawn poses of the worksheet:
+
+  | Robot | World | Spawn x, y, yaw | Real-time factor |
+  |---|---|---|---|
+  | TurtleBot3 | `turtlebot3_house` | -2.0, -2.5, 0 | 0.92 to 0.97 |
+  | ROSbot skid-steer | `husarion_world` | 0, -2, 0 (the default) | 0.94 |
+  | ROSbot mecanum | `husarion_world` | 0, -2, 0 (the default) | 0.94 |
+  | Ackermann | `husarion_world` | 0, -2, 0 | 0.94 |
+
+- The same runs in empty worlds (`empty_world`, `empty_with_plugins`, Gazebo's
+  `empty.sdf`) gave the same numbers within the spread stated below, so nothing
+  is touched and the floors behave alike. Smallest laser range seen during
+  three consecutive runs: 0.94 m (skid-steer), 0.95 m (mecanum); 1.49 m during
+  the second and third TurtleBot3 run. The Ackermann robot has no laser; its
+  first run matches the empty world to the millimetre.
 - Each simulation in its own container on Docker's default bridge network with
   `ROS_LOCALHOST_ONLY=1` and a non-zero `ROS_DOMAIN_ID`. Not with `./run.sh`:
   the student path (host networking, Gazebo window open) was not run. The
@@ -16,6 +29,11 @@ students before the hand-in.
 - Three consecutive runs of `drive_test.py` per robot in one simulation
   session, without restarting the simulation between runs. The tables show the
   first run. The spread over the three runs is given below each table.
+- **Only the first Ackermann run after a start is valid in `husarion_world`.**
+  The robot ends each run about 1.5 m ahead and facing left, and the second
+  run drove it into the logo: true motion 0.899 m in the straight line and
+  0.003 m in the arc, while wheel odometry still read 1.000 m and 0.524 m.
+  The worksheet tells students to restart the simulation before repeating.
 - Each cell is `fwd m / left m / turn °` in the frame the robot had at the
   start of the manoeuvre.
 
@@ -26,13 +44,13 @@ students before the hand-in.
 | Manoeuvre | Commanded | True (Gazebo) | Wheel odometry |
 |---|---|---|---|
 | straight | 1.000 / 0.000 / 0.0 | 1.020 / 0.000 / 0.0 | 1.020 / 0.000 / 0.0 |
-| spin | 0.000 / 0.000 / 114.6 | -0.001 / -0.003 / 120.6 | 0.000 / 0.000 / 121.0 |
-| arc | 0.364 / 0.566 / 114.6 | 0.400 / 0.551 / 115.5 | 0.399 / 0.554 / 115.9 |
+| spin | 0.000 / 0.000 / 114.6 | -0.002 / -0.003 / 122.0 | 0.000 / 0.000 / 122.5 |
+| arc | 0.364 / 0.566 / 114.6 | 0.409 / 0.543 / 115.1 | 0.408 / 0.547 / 115.5 |
 | sideways | 0.000 / 1.000 / 0.0 | 0.000 / 0.000 / -0.2 | 0.000 / 0.000 / -0.2 |
 
 Spread over three runs: straight 1.020 m every time, with up to 0.022 m and
-0.9° of drift to the right; spin true 119.1° to 120.6°; arc true 115.5° to
-115.9°. Wheel odometry turn minus true turn: +0.4° to +0.5° in every spin and
+1.0° of drift to the right; spin true 120.8° to 122.0°; arc true 115.1° to
+116.1°. In `empty_world`: spin 119.1° to 122.0°, arc 115.1° to 116.1°. Wheel odometry turn minus true turn: +0.4° to +0.5° in every spin and
 arc.
 
 **Skid-steer (ROSbot 2R)**
@@ -44,10 +62,10 @@ arc.
 | arc | 0.364 / 0.566 / 114.6 | 0.394 / 0.544 / 114.3 | 0.354 / 0.573 / 114.6 |
 | sideways | 0.000 / 1.000 / 0.0 | 0.000 / 0.000 / 0.0 | 0.000 / 0.000 / 0.0 |
 
-Spread over three runs: spin true 114.2° to 117.8°, with the robot 0.034 to
-0.039 m forward and 0.018 to 0.024 m to the right of where it started; spin
-odometry 114.6° twice and 117.5° once; arc true 114.3° to 118.1°, arc odometry
-identical in all three. Wheel odometry turn minus true turn: -3.5° to +0.4°.
+Spread over three runs: spin true 114.5° to 117.1°, with the robot 0.032 to
+0.039 m forward and 0.018 to 0.026 m to the right of where it started; spin
+odometry 114.6° every time (117.5° also occurs: once in three runs in the
+empty world); arc true 114.3° to 118.3°, arc odometry identical in all three. Wheel odometry turn minus true turn: -3.5° to +0.4°.
 
 **Mecanum (ROSbot 2R, `mecanum:=true`)**
 
@@ -72,9 +90,9 @@ further runs in other sessions gave the same spin and arc; one of them gave
 | arc | 0.364 / 0.566 / 114.6 | 0.530 / 0.475 / 86.1 | 0.525 / 0.490 / 88.8 |
 | sideways | 0.000 / 1.000 / 0.0 | 0.000 / 0.000 / 0.0 | 0.000 / 0.000 / 0.0 |
 
-Spread over three runs: arc true forward 0.527 to 0.530 m, left 0.475 to
-0.477 m, turn 86.1° every time; straight drifts up to 0.002 m to the left;
-everything else identical. Wheel odometry turn minus true turn: +2.7° in the
+One run; see above for why. Three runs in the empty world: arc true forward
+0.527 to 0.530 m, left 0.475 to 0.477 m, turn 86.1° every time; straight
+drifts up to 0.002 m to the left; everything else identical. Wheel odometry turn minus true turn: +2.7° in the
 arc.
 
 Arc radius from the true numbers, `sqrt(fwd² + left²) / (2 · sin(turn / 2))`,
@@ -97,6 +115,14 @@ first run of each robot:
   on simulation time, not on the wall clock.
 
 ## Things about the simulation worth knowing before class
+
+- **Do not run this lab in the `landmark` world.** The TurtleBot3 is unsteady
+  there: spins of 127° and 105° in consecutive runs, and 13° to 19° of
+  rotation while standing still during the sideways command, with nothing
+  within reach to hit. Unlike `empty_world` and `turtlebot3_house`, the
+  `landmark` world file has no solver settings and runs on Gazebo's defaults;
+  that this is the cause was not tested. `turtlebot3_world` is too cramped for
+  the manoeuvres and was not run.
 
 - **TurtleBot3 `/odom` is not wheel odometry.** The Gazebo plugin fills it from
   the simulator's pose. Comparing it with the truth always gives zero error.
@@ -133,7 +159,7 @@ first run of each robot:
 ## Expected answers
 
 1. **Spin on the spot.** Differential, skid-steer and mecanum turn on the
-   spot: about 120°, 117° and 128°. The differential and mecanum robots stay
+   spot: about 121°, 117° and 128°. The differential and mecanum robots stay
    within 3 mm of their place. The skid-steer robot ends about 4 cm away: its
    four wheels point straight ahead, so to turn they must slide sideways over
    the floor, and the sliding is not symmetric. The Ackermann robot turns
