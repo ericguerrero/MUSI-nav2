@@ -113,3 +113,50 @@ def test_headless_runs_the_server_only():
     assert "-s" in launch.gazebo_args(True).split()
     assert "-s" not in launch.gazebo_args(False).split()
     assert "-r" in launch.gazebo_args(False).split()
+
+
+# --- world argument ---
+
+@pytest.fixture
+def worlds_dir(tmp_path):
+    (tmp_path / "husarion_world.sdf").write_text("<sdf/>")
+    return tmp_path
+
+
+def test_empty_world_is_gazebos_own_and_needs_no_worlds_directory():
+    assert launch.resolve_world("empty", "/no/such/directory") == "empty.sdf"
+
+
+def test_empty_world_needs_no_action_before_gazebo():
+    assert launch.world_actions("empty") == ("empty.sdf", [])
+
+
+def test_rosbot_world_name_resolves_to_its_sdf(worlds_dir):
+    assert launch.resolve_world("husarion_world", str(worlds_dir)) == str(
+        worlds_dir / "husarion_world.sdf")
+
+
+def test_absolute_world_path_is_kept(worlds_dir):
+    path = str(worlds_dir / "husarion_world.sdf")
+    assert launch.resolve_world(path, "/no/such/directory") == path
+
+
+def test_unknown_world_is_refused_with_the_rosbot_launch_error(worlds_dir):
+    with pytest.raises(ValueError, match="Unknown world 'moon'"):
+        launch.resolve_world("moon", str(worlds_dir))
+
+
+def test_rosbot_world_puts_its_models_on_gazebos_path(tmp_path, monkeypatch):
+    # The unit tests run without the ROSbot workspace sourced, so the package
+    # lookup is pointed at a stand-in share directory.
+    (tmp_path / "worlds").mkdir()
+    (tmp_path / "worlds" / "husarion_world.sdf").write_text("<sdf/>")
+    monkeypatch.setattr(launch, "get_package_share_directory", lambda name: str(tmp_path))
+    world_file, actions = launch.world_actions("husarion_world")
+    assert world_file == str(tmp_path / "worlds" / "husarion_world.sdf")
+    assert len(actions) == 1
+
+
+def test_world_file_is_the_last_gazebo_argument():
+    assert launch.gazebo_args(True, "/w/husarion_world.sdf").split()[-1] == "/w/husarion_world.sdf"
+    assert launch.gazebo_args(False).split()[-1] == "empty.sdf"

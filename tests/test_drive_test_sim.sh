@@ -8,6 +8,10 @@
 # its minimum radius. They are not the reference numbers of the worksheet; those
 # vary by a few percent from run to run.
 #
+# Every robot runs in the world and at the spawn pose of the worksheet
+# (turtlebot3_house at -2, -2.5; husarion_world at 0, -2): a collision there
+# would show up as a failed row.
+#
 # Runs inside the image. Use tests/run_drive_test_sim_test.sh from the host.
 
 ROBOT="${ROBOT:-rosbot}"
@@ -25,22 +29,22 @@ fi
 case "${ROBOT}" in
     turtlebot3)
         export TURTLEBOT3_MODEL=waffle
-        LAUNCH="/ros2_ws/src/simulation.launch.py world:=empty_world headless:=true rviz:=false"
+        LAUNCH="/ros2_ws/src/simulation.launch.py world:=turtlebot3_house x:=-2.0 y:=-2.5 headless:=true rviz:=false"
         READY="spawn_entity.*process has finished cleanly"
         SPEED_TOPIC=/odom
         SIDEWAYS_M=0.0 ;;
     rosbot)
-        LAUNCH="/ros2_ws/src/rosbot_simulation.launch.py world:=empty_with_plugins headless:=true"
+        LAUNCH="/ros2_ws/src/rosbot_simulation.launch.py world:=husarion_world x:=0.0 y:=-2.0 headless:=true"
         READY="Configured and activated .*rosbot_base_controller"
         SPEED_TOPIC=/rosbot_base_controller/odom
         SIDEWAYS_M=0.0 ;;
     rosbot_mecanum)
-        LAUNCH="/ros2_ws/src/rosbot_simulation.launch.py world:=empty_with_plugins headless:=true mecanum:=true"
+        LAUNCH="/ros2_ws/src/rosbot_simulation.launch.py world:=husarion_world x:=0.0 y:=-2.0 headless:=true mecanum:=true"
         READY="Configured and activated .*rosbot_base_controller"
         SPEED_TOPIC=/rosbot_base_controller/odom
         SIDEWAYS_M=1.0 ;;
     ackermann)
-        LAUNCH="/ros2_ws/src/ackermann_simulation.launch.py headless:=true"
+        LAUNCH="/ros2_ws/src/ackermann_simulation.launch.py world:=husarion_world x:=0.0 y:=-2.0 headless:=true"
         READY="Configured and activated .*ackermann_steering_controller"
         SPEED_TOPIC=/ackermann_steering_controller/odometry
         SIDEWAYS_M=0.0
