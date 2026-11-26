@@ -6,5 +6,6 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 exec docker run --rm \
     -v "${REPO}/ros2_ws:/ros2_ws:ro" \
     -v "${REPO}/tests:/tests:ro" \
+    -v "${REPO}/robot:/robot:ro" \
     nav2_student:humble \
     bash -lc "python3 -m pytest /tests/ -v -p no:cacheprovider ${*}"
