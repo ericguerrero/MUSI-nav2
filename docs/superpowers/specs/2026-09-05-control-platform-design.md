@@ -177,6 +177,11 @@ retargeting both from odometry-drift analysis to control tracking analysis:
 
 ### 3.4 Robot design path
 
+**Superseded 2026-09-24.** The worked Ackermann robot, its controller YAML and
+the `SmacPlannerHybrid` variant are cut; `docs/robot_design.md` stays as a
+recipe. The lab's ROSbot 2R covers skid-steer and mecanum. See
+`2026-09-24-rosbot2r-migration-design.md` §8.
+
 **Revised 2026-09-22 after a stack audit.** This section originally specified
 hand-authoring an Ackermann chassis around `libgazebo_ros_ackermann_drive.so`.
 That is the older Gazebo-plugin approach, and it was the wrong call: the image
@@ -219,6 +224,10 @@ remove the deliverable: authoring a robot for their chosen application *is* the
 student assignment.
 
 ### 3.5 Stack currency (audited 2026-09-22)
+
+**Superseded 2026-09-24.** Jazzy dropped ROSbot 2R support, so the migration
+target is Gazebo Fortress on Humble, not Harmonic on Jazzy. See
+`2026-09-24-rosbot2r-migration-design.md` §1.2.
 
 | Component | Installed | Note |
 |---|---|---|
@@ -329,9 +338,9 @@ stretch goal per §9.
 6. `trajectory_analyzer.py` emits cross-track error, heading error, RMSE, and max
    error for a recorded run.
 7. `visualize_trajectory.py` writes a PNG plotting reference against actual.
-8. The Ackermann robot spawns, accepts `Twist` on `/cmd_vel`, and exhibits a
+8. *(Dropped 2026-09-24 with the Ackermann example.)* The Ackermann robot spawns, accepts `Twist` on `/cmd_vel`, and exhibits a
    nonzero turning radius.
-9. *(Stretch)* Nav2 plans a feasible path for the Ackermann robot using
+9. *(Dropped 2026-09-24.)* Nav2 plans a feasible path for the Ackermann robot using
    `SmacPlannerHybrid`. Criteria 1-8 and 10-12 are required; this one is
    droppable under schedule pressure, consistent with the risk table in §9.
 10. A committed table records pass/fail for every demo: simulation, nav2,

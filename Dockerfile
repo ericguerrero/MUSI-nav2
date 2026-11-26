@@ -1,3 +1,7 @@
+# Pinned by digest: the tag is the only remaining copy of the ROSbot 2R
+# simulation packages that match the lab robot's driver (see below).
+FROM husarion/rosbot-gazebo:humble-0.14.0-20250319@sha256:909c1b195fcacb21f415f53b7494e2f65e98e212f70dbd8da6128b24f1cda694 AS rosbot_gazebo
+
 FROM osrf/ros:humble-desktop-full
 
 # Metadata for documentation
@@ -43,6 +47,46 @@ RUN apt-get update && apt-get install -y \
 # Install Python dependencies for Nav2 examples and SLAM metrics
 RUN pip3 install --no-cache-dir transforms3d numpy pillow pyyaml scipy matplotlib
 
+# Husarion ROSbot 2R stack for Gazebo Fortress, as an underlay outside
+# /ros2_ws so the bind-mounted student workspace cannot shadow it.
+#
+# Taken from Husarion's simulation image of the same build as the driver on the
+# lab robot (husarion/rosbot:humble-0.14.0-20250319, rosbot_ros commit
+# c860d02), so simulation and robot share topics, frames and controller limits.
+# It is copied rather than built because that commit can no longer be built
+# from source: its pinned ros_components_description repository was deleted
+# upstream and the renamed repository no longer holds the pinned commit.
+#
+# Runtime dependencies are listed by hand: `rosdep check` over the copied
+# package.xml files, with HUSARION_ROS_BUILD_TYPE=simulation, reports only
+# these two as missing for simulation. ros_gz and Gazebo Fortress already come
+# with humble-desktop-full. The other unmet keys (libgpiod, pyftdi, pyserial,
+# usbutils) serve firmware flashing on the real robot. rosdep install cannot
+# be pointed at the install tree directly: colcon's COLCON_IGNORE there makes
+# it find no packages and report success.
+#
+# The copied setup hooks hard-code the original /ros2_ws/install prefix, and
+# Gazebo resolves the robot's meshes through the IGN_GAZEBO_RESOURCE_PATH they
+# set. Here /ros2_ws is the student workspace, so the prefix is rewritten in
+# every text file; without it the robot simulates but renders invisible.
+#
+# Patches, each against the installed rosbot_description/urdf file it names:
+# 0001 makes the camera optional (ROSBOT_CAMERA), 0002 gives the ordinary
+# wheels real skid-steer friction instead of the mecanum roller friction
+# Husarion applies to every wheel.
+COPY --from=rosbot_gazebo /ros2_ws/install /opt/rosbot_ws/install
+COPY patches/rosbot_ros /tmp/rosbot_ros_patches
+RUN URDF=/opt/rosbot_ws/install/rosbot_description/share/rosbot_description/urdf \
+    && patch "${URDF}/rosbot.urdf.xacro" < /tmp/rosbot_ros_patches/0001-optional-camera.patch \
+    && patch "${URDF}/wheel.urdf.xacro" < /tmp/rosbot_ros_patches/0002-skid-steer-friction.patch \
+    && rm -rf /tmp/rosbot_ros_patches \
+    && grep -rlI /ros2_ws/install /opt/rosbot_ws/install \
+        | xargs sed -i 's#/ros2_ws/install#/opt/rosbot_ws/install#g' \
+    && apt-get update && apt-get install -y \
+        ros-humble-ign-ros2-control \
+        ros-humble-robot-localization \
+    && rm -rf /var/lib/apt/lists/*
+
 # Run as a non-root user whose UID/GID match the host user. Everything written
 # into ./ros2_ws and ./shared lands on the host, and while the container ran as
 # root those files were root-owned: students could not edit or delete their own
@@ -69,6 +113,7 @@ WORKDIR /ros2_ws
 
 # Configure bashrc for automatic sourcing and welcome message
 RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc && \
+    echo "source /opt/rosbot_ws/install/local_setup.bash" >> ~/.bashrc && \
     echo "if [ -f /ros2_ws/install/setup.bash ]; then source /ros2_ws/install/setup.bash; fi" >> ~/.bashrc && \
     echo "echo ''" >> ~/.bashrc && \
     echo "echo '🤖 Nav2 Student Environment Ready!'" >> ~/.bashrc && \
