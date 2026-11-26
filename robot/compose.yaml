@@ -1,0 +1,50 @@
+# ROSbot 2R stack. Driver image and STM32 firmware are a pair: 0.14.0 with 0.11.0.
+#
+# No restart policy on purpose. On 2026-11-14 the robot lost power twice within
+# two minutes of the lidar starting; with containers restarting at boot that
+# became a reboot loop with only seconds of SSH access to break it. Start at
+# boot only once the hardware check passes on a stable supply.
+x-common: &common
+  network_mode: host
+  ipc: host
+
+services:
+  rosbot:
+    <<: *common
+    image: husarion/rosbot:humble-0.14.0-20250319
+    container_name: rosbot
+    devices:
+      - /dev/ttySERIAL
+    command: ros2 launch rosbot_bringup bringup.launch.py mecanum:=False
+
+  rplidar:
+    <<: *common
+    image: husarion/rplidar:humble-1.0.1-20260522
+    container_name: rplidar
+    devices:
+      - /dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_2473bdf883f7a4499f60d30ee717398b-if00-port0:/dev/ttyUSB0
+    # The delay keeps the lidar motor's start-up current away from the driver's
+    # start and, at boot, from the Raspberry Pi's own start-up load. It lives in
+    # the command because restart policies ignore depends_on.
+    #
+    # 256000 baud is the unit fitted to this robot (A2M12 class: 16 kHz
+    # sampling, firmware 1.32). An A2M8 needs 115200. Both values can be
+    # overridden from an untracked .env file next to this one.
+    command: >
+      bash -c "sleep ${RPLIDAR_START_DELAY:-30} &&
+      ros2 launch /husarion_utils/rplidar.launch.yaml
+      channel_type:=serial
+      serial_baudrate:=${RPLIDAR_BAUDRATE:-256000}"
+
+  astra:
+    <<: *common
+    profiles: [camera]
+    image: husarion/astra:humble-1.1.0-20240319
+    container_name: astra
+    devices:
+      - /dev/bus/usb/
+      # The Pi's H.264 encoder. The launch file's default codec, "rpi", makes
+      # the compressed image transport open it; without the device the camera
+      # node dies with a segmentation fault as soon as the colour stream starts.
+      - /dev/video11
+    command: ros2 launch /husarion_utils/astra.launch.py device_namespace:=camera
