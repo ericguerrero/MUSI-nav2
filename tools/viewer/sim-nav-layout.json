@@ -1,0 +1,698 @@
+{
+  "configById": {
+    "3D!nav": {
+      "layers": {
+        "grid": {
+          "layerId": "foxglove.Grid",
+          "visible": true,
+          "frameId": "map",
+          "size": 30,
+          "divisions": 30,
+          "lineWidth": 1,
+          "color": "#8a8a8a33",
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "order": 1
+        }
+      },
+      "cameraState": {
+        "perspective": false,
+        "distance": 25,
+        "phi": 0,
+        "thetaOffset": 0,
+        "targetOffset": [
+          2,
+          1,
+          0
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "followTf": "map",
+      "scene": {
+        "transforms": {
+          "showLabel": false,
+          "axisScale": 0.4,
+          "labelSize": 0.1
+        }
+      },
+      "transforms": {
+        "frame:map": {
+          "visible": false
+        },
+        "frame:odom": {
+          "visible": false
+        },
+        "frame:body_link": {
+          "visible": false
+        },
+        "frame:cover_link": {
+          "visible": false
+        },
+        "frame:imu_link": {
+          "visible": false
+        },
+        "frame:laser": {
+          "visible": false
+        },
+        "frame:slamtec_rplidar_a2_link": {
+          "visible": false
+        },
+        "frame:camera_link": {
+          "visible": false
+        },
+        "frame:camera_orbbec_astra_link": {
+          "visible": false
+        },
+        "frame:camera_color_frame": {
+          "visible": false
+        },
+        "frame:camera_color_optical_frame": {
+          "visible": false
+        },
+        "frame:camera_depth_frame": {
+          "visible": false
+        },
+        "frame:camera_depth_optical_frame": {
+          "visible": false
+        },
+        "frame:fl_range": {
+          "visible": false
+        },
+        "frame:fr_range": {
+          "visible": false
+        },
+        "frame:rl_range": {
+          "visible": false
+        },
+        "frame:rr_range": {
+          "visible": false
+        },
+        "frame:fl_wheel_link": {
+          "visible": false
+        },
+        "frame:fr_wheel_link": {
+          "visible": false
+        },
+        "frame:rl_wheel_link": {
+          "visible": false
+        },
+        "frame:rr_wheel_link": {
+          "visible": false
+        }
+      },
+      "topics": {
+        "/map": {
+          "visible": true,
+          "frameLocked": true,
+          "colorMode": "map",
+          "alpha": 0.5
+        },
+        "/global_costmap/costmap": {
+          "visible": true,
+          "frameLocked": true,
+          "colorMode": "costmap",
+          "alpha": 0.35
+        },
+        "/local_costmap/costmap": {
+          "visible": true,
+          "frameLocked": true,
+          "colorMode": "costmap",
+          "alpha": 0.6
+        },
+        "/plan": {
+          "visible": true,
+          "type": "line",
+          "lineWidth": 0.06,
+          "gradient": [
+            "#00e676ff",
+            "#00e676ff"
+          ]
+        },
+        "/local_plan": {
+          "visible": true,
+          "type": "line",
+          "lineWidth": 0.05,
+          "gradient": [
+            "#ff9100ff",
+            "#ff9100ff"
+          ]
+        },
+        "/plan_smoothed": {
+          "visible": false
+        },
+        "/received_global_plan": {
+          "visible": false
+        },
+        "/transformed_global_plan": {
+          "visible": false
+        },
+        "/goal_pose": {
+          "visible": true,
+          "type": "arrow",
+          "arrowScale": [
+            0.6,
+            0.12,
+            0.12
+          ],
+          "color": "#ff2d95ff"
+        },
+        "/local_costmap/published_footprint": {
+          "visible": true,
+          "lineWidth": 0.03,
+          "color": "#00e5ffff"
+        },
+        "/global_costmap/published_footprint": {
+          "visible": false
+        },
+        "/explore/frontiers": {
+          "visible": true
+        },
+        "/slam_toolbox/graph_visualization": {
+          "visible": true
+        },
+        "/pose": {
+          "visible": false
+        },
+        "/scan": {
+          "visible": true,
+          "colorField": "range",
+          "colorMode": "colormap",
+          "colorMap": "turbo",
+          "pointSize": 4,
+          "decayTime": 0
+        },
+        "/scan_filtered": {
+          "visible": false
+        },
+        "/slam_toolbox/scan_visualization": {
+          "visible": false
+        },
+        "/camera/depth/points": {
+          "visible": false
+        },
+        "/cost_cloud": {
+          "visible": false
+        },
+        "/robot_description": {
+          "visible": true
+        }
+      },
+      "publish": {
+        "type": "pose",
+        "poseTopic": "/goal_pose",
+        "pointTopic": "/clicked_point",
+        "poseEstimateTopic": "/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      },
+      "imageMode": {},
+      "lichtblickPanelTitle": "Navigation: map, plan, goal"
+    },
+    "Image!rgb": {
+      "cameraState": {
+        "distance": 20,
+        "perspective": true,
+        "phi": 60,
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOffset": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "thetaOffset": 45,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "publish": {},
+      "imageMode": {
+        "imageTopic": "/camera/color/image_raw"
+      }
+    },
+    "Image!depth": {
+      "cameraState": {
+        "distance": 20,
+        "perspective": true,
+        "phi": 60,
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOffset": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "thetaOffset": 45,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "publish": {},
+      "imageMode": {
+        "imageTopic": "/camera/depth/image_raw",
+        "colorMode": "colormap",
+        "colorMap": "turbo",
+        "minValue": 0.4,
+        "maxValue": 6
+      }
+    },
+    "Teleop!drive": {
+      "topic": "/cmd_vel",
+      "publishRate": 10,
+      "upButton": {
+        "field": "linear-x",
+        "value": 0.4
+      },
+      "downButton": {
+        "field": "linear-x",
+        "value": -0.4
+      },
+      "leftButton": {
+        "field": "angular-z",
+        "value": 1
+      },
+      "rightButton": {
+        "field": "angular-z",
+        "value": -1
+      }
+    },
+    "Publish!exploreOn": {
+      "topicName": "/explore/resume",
+      "datatype": "std_msgs/msg/Bool",
+      "buttonText": "Start exploring",
+      "buttonTooltip": "Resume frontier exploration",
+      "buttonColor": "#2e7d32",
+      "advancedView": false,
+      "value": "{\n  \"data\": true\n}",
+      "lichtblickPanelTitle": "Explore: start"
+    },
+    "Publish!exploreOff": {
+      "topicName": "/explore/resume",
+      "datatype": "std_msgs/msg/Bool",
+      "buttonText": "Stop exploring",
+      "buttonTooltip": "Stop frontier exploration and cancel the current goal",
+      "buttonColor": "#c62828",
+      "advancedView": false,
+      "value": "{\n  \"data\": false\n}",
+      "lichtblickPanelTitle": "Explore: stop"
+    },
+    "Publish!forgetMap": {
+      "topicName": "/slam/forget_map",
+      "datatype": "std_msgs/msg/Empty",
+      "buttonText": "Forget map",
+      "buttonTooltip": "Restart SLAM: drop the map and start mapping again. Also stops exploring.",
+      "buttonColor": "#ef6c00",
+      "advancedView": false,
+      "value": "{}",
+      "lichtblickPanelTitle": "SLAM: forget map"
+    },
+    "RosOut!explore": {
+      "searchTerms": [
+        "explore_node",
+        "slam_supervisor"
+      ],
+      "minLogLevel": 2,
+      "topicToRender": "/rosout",
+      "lichtblickPanelTitle": "Explore: log"
+    },
+    "Plot!speed": {
+      "paths": [
+        {
+          "value": "/cmd_vel.linear.x",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/odometry/filtered.twist.twist.linear.x",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        },
+        {
+          "value": "/cmd_vel.angular.z",
+          "enabled": true,
+          "timestampMethod": "receiveTime"
+        }
+      ],
+      "minYValue": "",
+      "maxYValue": "",
+      "showLegend": true,
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "legendDisplay": "floating",
+      "showPlotValuesInLegend": false,
+      "sidebarDimension": 240,
+      "followingViewWidth": 30,
+      "lichtblickPanelTitle": "Speed: commanded vs measured"
+    },
+    "3D!robot": {
+      "layers": {
+        "grid": {
+          "layerId": "foxglove.Grid",
+          "visible": true,
+          "frameId": "map",
+          "size": 30,
+          "divisions": 30,
+          "lineWidth": 1,
+          "color": "#8a8a8a33",
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "order": 1
+        }
+      },
+      "cameraState": {
+        "perspective": true,
+        "distance": 2.2,
+        "phi": 62,
+        "thetaOffset": 115,
+        "targetOffset": [
+          0,
+          0,
+          0.1
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "followTf": "base_link",
+      "scene": {
+        "transforms": {
+          "showLabel": false,
+          "axisScale": 0.4,
+          "labelSize": 0.1
+        }
+      },
+      "transforms": {
+        "frame:map": {
+          "visible": false
+        },
+        "frame:odom": {
+          "visible": false
+        },
+        "frame:body_link": {
+          "visible": false
+        },
+        "frame:cover_link": {
+          "visible": false
+        },
+        "frame:imu_link": {
+          "visible": false
+        },
+        "frame:laser": {
+          "visible": false
+        },
+        "frame:slamtec_rplidar_a2_link": {
+          "visible": false
+        },
+        "frame:camera_link": {
+          "visible": false
+        },
+        "frame:camera_orbbec_astra_link": {
+          "visible": false
+        },
+        "frame:camera_color_frame": {
+          "visible": false
+        },
+        "frame:camera_color_optical_frame": {
+          "visible": false
+        },
+        "frame:camera_depth_frame": {
+          "visible": false
+        },
+        "frame:camera_depth_optical_frame": {
+          "visible": false
+        },
+        "frame:fl_range": {
+          "visible": false
+        },
+        "frame:fr_range": {
+          "visible": false
+        },
+        "frame:rl_range": {
+          "visible": false
+        },
+        "frame:rr_range": {
+          "visible": false
+        },
+        "frame:fl_wheel_link": {
+          "visible": false
+        },
+        "frame:fr_wheel_link": {
+          "visible": false
+        },
+        "frame:rl_wheel_link": {
+          "visible": false
+        },
+        "frame:rr_wheel_link": {
+          "visible": false
+        },
+        "frame:base_link": {
+          "visible": false
+        }
+      },
+      "topics": {
+        "/map": {
+          "visible": true,
+          "frameLocked": true,
+          "colorMode": "map",
+          "alpha": 0.5
+        },
+        "/global_costmap/costmap": {
+          "visible": false
+        },
+        "/local_costmap/costmap": {
+          "visible": true,
+          "frameLocked": true,
+          "colorMode": "costmap",
+          "alpha": 0.6
+        },
+        "/plan": {
+          "visible": true,
+          "type": "line",
+          "lineWidth": 0.06,
+          "gradient": [
+            "#00e676ff",
+            "#00e676ff"
+          ]
+        },
+        "/local_plan": {
+          "visible": true,
+          "type": "line",
+          "lineWidth": 0.05,
+          "gradient": [
+            "#ff9100ff",
+            "#ff9100ff"
+          ]
+        },
+        "/plan_smoothed": {
+          "visible": false
+        },
+        "/received_global_plan": {
+          "visible": false
+        },
+        "/transformed_global_plan": {
+          "visible": false
+        },
+        "/goal_pose": {
+          "visible": true,
+          "type": "arrow",
+          "arrowScale": [
+            0.6,
+            0.12,
+            0.12
+          ],
+          "color": "#ff2d95ff"
+        },
+        "/local_costmap/published_footprint": {
+          "visible": true,
+          "lineWidth": 0.03,
+          "color": "#00e5ffff"
+        },
+        "/global_costmap/published_footprint": {
+          "visible": false
+        },
+        "/explore/frontiers": {
+          "visible": true
+        },
+        "/slam_toolbox/graph_visualization": {
+          "visible": false
+        },
+        "/pose": {
+          "visible": false
+        },
+        "/scan": {
+          "visible": true,
+          "colorField": "range",
+          "colorMode": "colormap",
+          "colorMap": "turbo",
+          "pointSize": 4,
+          "decayTime": 0
+        },
+        "/scan_filtered": {
+          "visible": false
+        },
+        "/slam_toolbox/scan_visualization": {
+          "visible": false
+        },
+        "/camera/depth/points": {
+          "visible": false
+        },
+        "/cost_cloud": {
+          "visible": false
+        },
+        "/robot_description": {
+          "visible": true
+        }
+      },
+      "publish": {
+        "type": "pose",
+        "poseTopic": "/goal_pose",
+        "pointTopic": "/clicked_point",
+        "poseEstimateTopic": "/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      },
+      "imageMode": {},
+      "lichtblickPanelTitle": "Robot: chase view"
+    },
+    "Publish!resetSim": {
+      "topicName": "/sim/reset",
+      "datatype": "std_msgs/msg/Empty",
+      "buttonText": "Reset simulation",
+      "buttonTooltip": "Robot back to its start pose, odometry zeroed, map forgotten. Also stops exploring and cancels the goal.",
+      "buttonColor": "#6a1b9a",
+      "advancedView": false,
+      "value": "{}",
+      "lichtblickPanelTitle": "Simulation: reset"
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1
+  },
+  "layout": {
+    "direction": "row",
+    "first": "3D!nav",
+    "second": {
+      "direction": "column",
+      "first": {
+        "direction": "row",
+        "first": "3D!robot",
+        "second": {
+          "direction": "row",
+          "first": "Image!rgb",
+          "second": "Image!depth",
+          "splitPercentage": 50
+        },
+        "splitPercentage": 40
+      },
+      "second": {
+        "direction": "column",
+        "first": "Plot!speed",
+        "second": {
+          "direction": "row",
+          "first": "Teleop!drive",
+          "second": {
+            "direction": "column",
+            "first": {
+              "direction": "column",
+              "first": {
+                "direction": "row",
+                "first": "Publish!exploreOn",
+                "second": "Publish!exploreOff",
+                "splitPercentage": 50
+              },
+              "second": {
+                "direction": "row",
+                "first": "Publish!forgetMap",
+                "second": "Publish!resetSim",
+                "splitPercentage": 50
+              },
+              "splitPercentage": 50
+            },
+            "second": "RosOut!explore",
+            "splitPercentage": 60
+          },
+          "splitPercentage": 45
+        },
+        "splitPercentage": 40
+      },
+      "splitPercentage": 34
+    },
+    "splitPercentage": 62
+  }
+}

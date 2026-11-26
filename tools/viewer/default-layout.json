@@ -1,0 +1,89 @@
+{
+  "configById": {
+    "3D!scan": {
+      "layers": {
+        "grid": {
+          "layerId": "foxglove.Grid",
+          "visible": true,
+          "size": 12,
+          "divisions": 12,
+          "lineWidth": 1,
+          "color": "#8a8a8a55",
+          "position": [0, 0, 0],
+          "rotation": [0, 0, 0],
+          "order": 1
+        }
+      },
+      "cameraState": {
+        "perspective": false,
+        "distance": 14,
+        "phi": 0,
+        "thetaOffset": 0,
+        "targetOffset": [0, 0, 0],
+        "target": [0, 0, 0],
+        "targetOrientation": [0, 0, 0, 1],
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-none",
+      "scene": { "transforms": { "labelSize": 0.1, "axisScale": 0.6 } },
+      "transforms": {},
+      "topics": {
+        "/scan": {
+          "visible": true,
+          "colorField": "range",
+          "colorMode": "colormap",
+          "colorMap": "turbo",
+          "pointSize": 4,
+          "decayTime": 0
+        },
+        "/scan_filtered": { "visible": false },
+        "/map": { "visible": true, "frameLocked": true },
+        "/robot_description": { "visible": true }
+      },
+      "publish": { "type": "point" },
+      "imageMode": {}
+    },
+    "Image!rgb": {
+      "cameraState": { "distance": 20, "perspective": true, "phi": 60, "target": [0, 0, 0], "targetOffset": [0, 0, 0], "targetOrientation": [0, 0, 0, 1], "thetaOffset": 45, "fovy": 45, "near": 0.5, "far": 5000 },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "publish": {},
+      "imageMode": { "imageTopic": "/camera/color/image_raw" }
+    },
+    "Image!depth": {
+      "cameraState": { "distance": 20, "perspective": true, "phi": 60, "target": [0, 0, 0], "targetOffset": [0, 0, 0], "targetOrientation": [0, 0, 0, 1], "thetaOffset": 45, "fovy": 45, "near": 0.5, "far": 5000 },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "publish": {},
+      "imageMode": {
+        "imageTopic": "/camera/depth/image_raw",
+        "colorMode": "colormap",
+        "colorMap": "turbo",
+        "minValue": 0.4,
+        "maxValue": 6
+      }
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": { "speed": 1 },
+  "layout": {
+    "direction": "row",
+    "first": "3D!scan",
+    "second": {
+      "direction": "column",
+      "first": "Image!rgb",
+      "second": "Image!depth",
+      "splitPercentage": 50
+    },
+    "splitPercentage": 60
+  }
+}
