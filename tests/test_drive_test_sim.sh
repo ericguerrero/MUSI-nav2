@@ -1,15 +1,19 @@
 #!/bin/bash
-# drive_test.py against one simulated robot: turtlebot3, rosbot or
-# rosbot_mecanum, chosen with ROBOT.
+# drive_test.py against one simulated robot: turtlebot3, rosbot,
+# rosbot_mecanum or ackermann, chosen with ROBOT.
 #
 # The checks are the drive properties the lab is about, with wide margins: every
-# robot drives straight and spins on the spot, and only the mecanum robot moves
-# sideways. They are not the reference numbers of the worksheet; those vary by a
-# few percent from run to run.
+# robot drives straight, all but the Ackermann robot spin on the spot, only the
+# mecanum robot moves sideways, and the Ackermann robot turns no tighter than
+# its minimum radius. They are not the reference numbers of the worksheet; those
+# vary by a few percent from run to run.
 #
 # Runs inside the image. Use tests/run_drive_test_sim_test.sh from the host.
 
 ROBOT="${ROBOT:-rosbot}"
+SPINS=yes
+# The arc is commanded at 0.2 m/s and 0.5 rad/s, a radius of 0.40 m.
+ARC_RADIUS_M=0.40
 STARTUP_TIMEOUT_S="${STARTUP_TIMEOUT_S:-150}"
 NODE="python3 /ros2_ws/src/drive_test.py --ros-args -p robot:=${ROBOT}"
 
@@ -35,8 +39,17 @@ case "${ROBOT}" in
         READY="Configured and activated .*rosbot_base_controller"
         SPEED_TOPIC=/rosbot_base_controller/odom
         SIDEWAYS_M=1.0 ;;
+    ackermann)
+        LAUNCH="/ros2_ws/src/ackermann_simulation.launch.py headless:=true"
+        READY="Configured and activated .*ackermann_steering_controller"
+        SPEED_TOPIC=/ackermann_steering_controller/odometry
+        SIDEWAYS_M=0.0
+        SPINS=no
+        # min_turn_radius in ackermann.urdf.xacro: the commanded 0.40 m is
+        # tighter than the steering allows.
+        ARC_RADIUS_M=0.50 ;;
     *)
-        echo "ROBOT must be turtlebot3, rosbot or rosbot_mecanum, got '${ROBOT}'"
+        echo "ROBOT must be turtlebot3, rosbot, rosbot_mecanum or ackermann, got '${ROBOT}'"
         exit 2 ;;
 esac
 
@@ -68,6 +81,15 @@ exits_with() {  # expected code, then the command; output kept in /tmp/drive_tes
 cell() {
     awk -F'|' -v name="$1" -v block="$2" -v column="$3" \
         '$1 ~ "^" name " " { split($block, n, " "); print n[column] }' /tmp/drive_test.out
+}
+
+# Radius of the circle through the start and the end of the arc, from the true
+# motion: chord / (2 sin(turn / 2)).
+arc_radius() {
+    awk -v f="$(cell arc 3 1)" -v l="$(cell arc 3 2)" -v deg="$(cell arc 3 3)" 'BEGIN {
+        half = deg * 3.14159265 / 360
+        if (f == "" || half < 0.05) exit
+        printf "%.3f", sqrt(f * f + l * l) / (2 * sin(half)) }'
 }
 
 # Largest of the robot's linear and angular speed, from one odometry message.
@@ -119,12 +141,22 @@ check "straight: really moved ${true_m} m forward (1.00 +- 0.10)" within "${true
 check "straight: wheel odometry ${odom_m} m agrees with the truth (+- 0.05)" within "${odom_m}" "${true_m}" 0.05
 
 true_deg="$(cell spin 3 3)"
-check "spin: really turned ${true_deg} deg (at least 90)" at_least "${true_deg}" 90
+if [ "${SPINS}" = yes ]; then
+    check "spin: really turned ${true_deg} deg (at least 90)" at_least "${true_deg}" 90
+else
+    check "spin: did not turn, ${true_deg} deg (0 +- 3)" within "${true_deg}" 0 3
+fi
 check "spin: stayed on the spot, forward $(cell spin 3 1) m (0 +- 0.10)" within "$(cell spin 3 1)" 0 0.10
 check "spin: stayed on the spot, left $(cell spin 3 2) m (0 +- 0.10)" within "$(cell spin 3 2)" 0 0.10
 
 check "arc: really turned $(cell arc 3 3) deg (at least 60)" at_least "$(cell arc 3 3)" 60
 check "arc: really moved $(cell arc 3 2) m to the left (at least 0.3)" at_least "$(cell arc 3 2)" 0.3
+radius="$(arc_radius)"
+check "arc: true radius ${radius} m (${ARC_RADIUS_M} +- 0.08)" within "${radius}" "${ARC_RADIUS_M}" 0.08
+if [ "${SPINS}" = no ]; then
+    # Below the minimum only by measurement noise, as in test_ackermann_sim.sh.
+    check "arc: true radius ${radius} m is not below the minimum (0.50 - 0.03)" at_least "${radius}" 0.47
+fi
 
 true_m="$(cell sideways 3 2)"
 check "sideways: really moved ${true_m} m to the left (${SIDEWAYS_M} +- 0.15)" within "${true_m}" "${SIDEWAYS_M}" 0.15

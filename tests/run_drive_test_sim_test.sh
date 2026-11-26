@@ -1,7 +1,7 @@
 #!/bin/bash
 # Run the drive comparison simulation test inside the image, once per robot.
 #
-#   tests/run_drive_test_sim_test.sh                  all three robots
+#   tests/run_drive_test_sim_test.sh                  all four robots
 #   tests/run_drive_test_sim_test.sh rosbot_mecanum   one robot
 #
 # Deliberately not --network host: the lab ROSbot 2R runs on ROS_DOMAIN_ID 0
@@ -12,7 +12,7 @@
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ROBOTS=("$@")
 if [ "${#ROBOTS[@]}" -eq 0 ]; then
-    ROBOTS=(turtlebot3 rosbot rosbot_mecanum)
+    ROBOTS=(turtlebot3 rosbot rosbot_mecanum ackermann)
 fi
 
 failed=0
