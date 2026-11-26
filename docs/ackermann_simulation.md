@@ -17,10 +17,13 @@ ros2 launch /ros2_ws/src/ackermann_simulation.launch.py
 
 | Argument | Default | Meaning |
 |---|---|---|
+| `world` | `empty` | `empty` (a flat floor), or a world of the ROSbot simulation: `husarion_world`, `husarion_office`, `empty_with_plugins`, `sonoma_raceway`, or an absolute `.sdf` path |
 | `headless` | `false` | `true` runs Gazebo without its window |
 | `x`, `y`, `yaw` | `0.0`, `0.0`, `0.0` | spawn pose, metres and radians |
 
-The world is Gazebo's empty flat world. Drive from a second terminal:
+Without `world`, the robot stands on Gazebo's empty flat floor. In
+`husarion_world`, start it where the ROSbot starts, clear of the logo:
+`world:=husarion_world y:=-2.0`. Drive from a second terminal:
 
 ```bash
 ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.3}, angular: {z: 0.3}}"
