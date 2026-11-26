@@ -1,0 +1,19 @@
+explore_node:
+  ros__parameters:
+    use_sim_time: true
+    robot_base_frame: base_link
+    # The SLAM map, not the global costmap: frontiers are free cells next to
+    # unknown ones, and inflation in the costmap hides narrow openings.
+    costmap_topic: map
+    costmap_updates_topic: map_updates
+    visualize: true
+    planner_frequency: 0.15
+    # The simulation runs at about half real time with the camera on, so a
+    # goal needs longer than the upstream 30 s before it counts as stuck.
+    progress_timeout: 60.0
+    potential_scale: 3.0
+    orientation_scale: 0.0
+    gain_scale: 1.0
+    transform_tolerance: 0.5
+    min_frontier_size: 0.5
+    return_to_init: true

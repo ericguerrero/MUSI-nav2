@@ -144,6 +144,11 @@ shared/backups/
 *.backup
 
 # ==============================================================================
+# Viewer tooling: third-party exploration workspace, built locally
+# ==============================================================================
+tools/viewer/explore_ws/
+
+# ==============================================================================
 # Keep Empty Directories (explicitly tracked)
 # ==============================================================================
 # Use .gitkeep files in empty directories
