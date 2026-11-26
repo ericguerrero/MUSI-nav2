@@ -19,6 +19,11 @@ services:
       - QT_X11_NO_MITSHM=1
       - TURTLEBOT3_MODEL=waffle
       - ROS_DOMAIN_ID=0
+      #NVIDIA GPU
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - __GLX_VENDOR_LIBRARY_NAME=nvidia
+      - __NV_PRIME_RENDER_OFFLOAD=1
     volumes:
       # Persistent workspace
       - ./ros2_ws:/ros2_ws
@@ -30,3 +35,10 @@ services:
     stdin_open: true
     tty: true
     command: /bin/bash
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
