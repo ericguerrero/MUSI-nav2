@@ -1,0 +1,162 @@
+<?xml version="1.0"?>
+<!--
+  Car-like robot for the drive comparison lab: rear wheels driven, front wheels
+  steered, no sensors.
+
+  The steering joint limits are what make it car-like. They are derived from
+  min_turn_radius so that at full lock both front wheels point at the same
+  turning centre (Ackermann geometry): the inner wheel reaches a larger angle
+  than the outer one, hence the asymmetric limits per wheel.
+
+  base_link sits on the ground under the middle of the rear axle. That is the
+  point whose path is a circle of radius wheelbase / tan(steering angle), and
+  the point ackermann_steering_controller computes odometry for.
+
+  wheelbase, track and wheel_radius are repeated in ackermann_controllers.yaml;
+  tests/test_ackermann_description.py fails when the two files disagree.
+-->
+<robot name="ackermann" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:arg name="controllers_file" default="" />
+
+  <xacro:property name="wheelbase" value="0.26" />
+  <xacro:property name="track" value="0.20" />
+  <xacro:property name="wheel_radius" value="0.04" />
+  <xacro:property name="wheel_width" value="0.03" />
+  <xacro:property name="min_turn_radius" value="0.50" />
+
+  <xacro:property name="steer_inner" value="${atan(wheelbase / (min_turn_radius - track / 2))}" />
+  <xacro:property name="steer_outer" value="${atan(wheelbase / (min_turn_radius + track / 2))}" />
+
+  <xacro:property name="chassis_length" value="0.36" />
+  <xacro:property name="chassis_width" value="0.12" />
+  <xacro:property name="chassis_height" value="0.05" />
+  <xacro:property name="chassis_mass" value="2.0" />
+  <xacro:property name="wheel_mass" value="0.15" />
+  <!-- 1 m/s at the wheel rim, with margin for the outer wheel in a turn. -->
+  <xacro:property name="wheel_max_speed" value="${1.3 / wheel_radius}" />
+
+  <material name="blue"><color rgba="0.1 0.3 0.8 1.0" /></material>
+  <material name="black"><color rgba="0.1 0.1 0.1 1.0" /></material>
+
+  <link name="base_link" />
+
+  <joint name="chassis_joint" type="fixed">
+    <parent link="base_link" />
+    <child link="chassis_link" />
+    <origin xyz="${wheelbase / 2} 0 ${wheel_radius + 0.01}" rpy="0 0 0" />
+  </joint>
+
+  <link name="chassis_link">
+    <visual>
+      <geometry><box size="${chassis_length} ${chassis_width} ${chassis_height}" /></geometry>
+      <material name="blue" />
+    </visual>
+    <collision>
+      <geometry><box size="${chassis_length} ${chassis_width} ${chassis_height}" /></geometry>
+    </collision>
+    <inertial>
+      <mass value="${chassis_mass}" />
+      <inertia ixx="${chassis_mass * (chassis_width**2 + chassis_height**2) / 12}"
+               iyy="${chassis_mass * (chassis_length**2 + chassis_height**2) / 12}"
+               izz="${chassis_mass * (chassis_length**2 + chassis_width**2) / 12}"
+               ixy="0" ixz="0" iyz="0" />
+    </inertial>
+  </link>
+
+  <xacro:macro name="wheel" params="name parent x y z">
+    <joint name="${name}_wheel_joint" type="continuous">
+      <parent link="${parent}" />
+      <child link="${name}_wheel_link" />
+      <origin xyz="${x} ${y} ${z}" rpy="0 0 0" />
+      <axis xyz="0 1 0" />
+      <limit effort="5.0" velocity="${wheel_max_speed}" />
+    </joint>
+    <link name="${name}_wheel_link">
+      <visual>
+        <origin rpy="${pi / 2} 0 0" />
+        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}" /></geometry>
+        <material name="black" />
+      </visual>
+      <collision>
+        <origin rpy="${pi / 2} 0 0" />
+        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}" /></geometry>
+      </collision>
+      <inertial>
+        <mass value="${wheel_mass}" />
+        <inertia ixx="${wheel_mass * (3 * wheel_radius**2 + wheel_width**2) / 12}"
+                 iyy="${wheel_mass * wheel_radius**2 / 2}"
+                 izz="${wheel_mass * (3 * wheel_radius**2 + wheel_width**2) / 12}"
+                 ixy="0" ixz="0" iyz="0" />
+      </inertial>
+    </link>
+  </xacro:macro>
+
+  <!-- The wheel turns about a vertical axis through its own contact point, so
+       steering does not drag the tyre sideways. -->
+  <xacro:macro name="steered_wheel" params="name y lower upper">
+    <joint name="${name}_steering_joint" type="revolute">
+      <parent link="base_link" />
+      <child link="${name}_steering_link" />
+      <origin xyz="${wheelbase} ${y} ${wheel_radius}" rpy="0 0 0" />
+      <axis xyz="0 0 1" />
+      <limit lower="${lower}" upper="${upper}" effort="5.0" velocity="3.0" />
+    </joint>
+    <link name="${name}_steering_link">
+      <inertial>
+        <mass value="0.05" />
+        <inertia ixx="1e-4" iyy="1e-4" izz="1e-4" ixy="0" ixz="0" iyz="0" />
+      </inertial>
+    </link>
+    <xacro:wheel name="${name}" parent="${name}_steering_link" x="0" y="0" z="0" />
+  </xacro:macro>
+
+  <xacro:wheel name="rear_left" parent="base_link" x="0" y="${track / 2}" z="${wheel_radius}" />
+  <xacro:wheel name="rear_right" parent="base_link" x="0" y="${-track / 2}" z="${wheel_radius}" />
+  <!-- Turning left (positive angle) the left wheel is the inner one. -->
+  <xacro:steered_wheel name="front_left" y="${track / 2}" lower="${-steer_outer}" upper="${steer_inner}" />
+  <xacro:steered_wheel name="front_right" y="${-track / 2}" lower="${-steer_inner}" upper="${steer_outer}" />
+
+  <ros2_control name="ackermann" type="system">
+    <hardware>
+      <plugin>ign_ros2_control/IgnitionSystem</plugin>
+    </hardware>
+    <joint name="rear_left_wheel_joint">
+      <command_interface name="velocity" />
+      <state_interface name="position" />
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="rear_right_wheel_joint">
+      <command_interface name="velocity" />
+      <state_interface name="position" />
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="front_left_steering_joint">
+      <command_interface name="position" />
+      <state_interface name="position" />
+    </joint>
+    <joint name="front_right_steering_joint">
+      <command_interface name="position" />
+      <state_interface name="position" />
+    </joint>
+  </ros2_control>
+
+  <gazebo>
+    <plugin filename="ign_ros2_control-system" name="ign_ros2_control::IgnitionROS2ControlPlugin">
+      <parameters>$(arg controllers_file)</parameters>
+      <ros>
+        <!-- The controller listens on its own topic; students publish /cmd_vel. -->
+        <remapping>ackermann_steering_controller/reference_unstamped:=cmd_vel</remapping>
+      </ros>
+    </plugin>
+    <!-- The simulator's own pose of base_link in the world, not an estimate. -->
+    <plugin filename="ignition-gazebo-odometry-publisher-system"
+            name="ignition::gazebo::systems::OdometryPublisher">
+      <odom_topic>/groundtruth/odom</odom_topic>
+      <odom_frame>world</odom_frame>
+      <robot_base_frame>base_link</robot_base_frame>
+      <odom_publish_frequency>50</odom_publish_frequency>
+    </plugin>
+  </gazebo>
+
+</robot>
